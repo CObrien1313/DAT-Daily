@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
+export const maxDuration = 60
+
 interface GenerateScheduleBody {
   examDate: string | null
   weeklyHours: number
@@ -25,7 +27,9 @@ export async function POST(request: NextRequest) {
 
   const client = new Anthropic()
 
-  const message = await client.messages.create({
+  let message
+  try {
+    message = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: [
@@ -84,6 +88,13 @@ Return this exact JSON shape (no markdown, no extra text):
       },
     ],
   })
+  } catch (err) {
+    console.error('[generate-schedule] Anthropic API error:', err)
+    return NextResponse.json(
+      { error: 'Failed to reach the AI. Please try again in a moment.' },
+      { status: 502 }
+    )
+  }
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : ''
 
