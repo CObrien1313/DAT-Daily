@@ -13,7 +13,7 @@ interface GenerateScheduleBody {
 export async function POST(request: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
-      { error: 'AI schedule generation is not configured. Add ANTHROPIC_API_KEY to .env.local.' },
+      { error: 'AI schedule generation is not configured.' },
       { status: 503 }
     )
   }
@@ -27,78 +27,38 @@ export async function POST(request: NextRequest) {
 
   const client = new Anthropic()
 
-  let message
+  let raw = ''
   try {
-    message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system: [
-      {
-        type: 'text',
-        text: `You are an expert DAT (Dental Admission Test) study coach. The DAT has 6 sections:
-- Biology (30 questions): cell biology, genetics, evolution, anatomy & physiology, ecosystems
-- General Chemistry (30 questions): stoichiometry, acid/base, equilibrium, electrochemistry, thermodynamics
-- Organic Chemistry (30 questions): reactions, mechanisms, nomenclature, spectroscopy, lab techniques
-- Perceptual Ability Test / PAT (90 questions): apertures, view recognition, angle ranking, hole punching, cube counting, pattern folding
-- Reading Comprehension (50 questions): three scientific passages with comprehension and reasoning questions
-- Quantitative Reasoning (40 questions): algebra, probability, statistics, geometry, trigonometry
-
-Rules for building weekly schedules:
-- Spread study across the week; allow rest days if weekly hours are low (< 10h)
-- Allocate 30–40% more time to weak subjects and subjects with low progress
-- PAT must appear every day — even 15-minute sessions build spatial intuition
-- Alternate between content review, active recall, and timed practice problems
-- Keep individual study blocks 25–90 minutes; mention breaks in task descriptions, do NOT add break entries as separate tasks
-- If exam is within 60 days, include at least one full timed section per week
-- Total minutes across all days should equal (weeklyHours × 60) ± 5%
-- Respond ONLY with the JSON object — no explanation, no markdown fences`,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: `Generate a personalized 7-day DAT study schedule for this student:
-
-${daysUntilExam !== null ? `- Days until exam: ${daysUntilExam}` : '- Exam date: not set yet (treat as 90 days out)'}
-- Weekly study hours: ${weeklyHours}
-- Subjects needing extra focus: ${weakSubjects.length > 0 ? weakSubjects.join(', ') : 'none specified'}
-- Current subject progress (0–100):
-${subjectProgress.map((sp) => `  • ${sp.subject}: ${sp.progress}%`).join('\n')}
-
-Return this exact JSON shape (no markdown, no extra text):
-{
-  "weeklyTip": "one specific, actionable tip for this student based on their profile",
-  "prioritySubjects": ["up to 3 subjects that need the most attention this week"],
-  "weeklyPlan": [
-    {
-      "day": "Monday",
-      "totalMinutes": 120,
-      "tasks": [
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      system: `You are a DAT study coach. Return ONLY a JSON object — no markdown, no explanation.
+DAT subjects: Biology, General Chemistry, Organic Chemistry, PAT, Reading Comprehension, Quantitative Reasoning.
+Rules: spread study across 7 days, weight weak subjects more, include PAT every day, no break entries as tasks.
+Keep every task description to one short sentence (under 15 words).`,
+      messages: [
         {
-          "subject": "Biology",
-          "topic": "Cell Division",
-          "durationMinutes": 60,
-          "description": "Review mitosis vs meiosis phases; draw diagrams from memory then check"
-        }
-      ]
-    }
-  ]
-}`,
-      },
-    ],
-  })
+          role: 'user',
+          content: `Create a 7-day DAT study schedule.
+${daysUntilExam !== null ? `Days until exam: ${daysUntilExam}` : 'Exam date: unknown (plan for 90 days out)'}
+Weekly hours: ${weeklyHours}
+Weak subjects: ${weakSubjects.length > 0 ? weakSubjects.join(', ') : 'none'}
+Progress: ${subjectProgress.map((s) => `${s.subject} ${s.progress}%`).join(', ')}
+
+JSON format:
+{"weeklyTip":"string","prioritySubjects":["s1","s2"],"weeklyPlan":[{"day":"Monday","totalMinutes":120,"tasks":[{"subject":"Biology","topic":"Cell Division","durationMinutes":60,"description":"Short one-sentence description."}]}]}`,
+        },
+      ],
+    })
+    raw = message.content[0].type === 'text' ? message.content[0].text : ''
   } catch (err) {
-    console.error('[generate-schedule] Anthropic API error:', err)
+    console.error('[generate-schedule] API error:', err)
     return NextResponse.json(
-      { error: 'Failed to reach the AI. Please try again in a moment.' },
+      { error: 'Failed to reach the AI. Please try again.' },
       { status: 502 }
     )
   }
 
-  const raw = message.content[0].type === 'text' ? message.content[0].text : ''
-
-  // Try the full text first, then strip fences, then extract the first {...} block
   const candidates = [
     raw.trim(),
     raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
@@ -108,14 +68,13 @@ Return this exact JSON shape (no markdown, no extra text):
   for (const candidate of candidates) {
     if (!candidate) continue
     try {
-      const schedule = JSON.parse(candidate)
-      return NextResponse.json(schedule)
+      return NextResponse.json(JSON.parse(candidate))
     } catch {
       // try next candidate
     }
   }
 
-  console.error('[generate-schedule] Could not parse response:', raw)
+  console.error('[generate-schedule] Could not parse:', raw)
   return NextResponse.json(
     { error: 'Could not parse the AI response. Please try again.' },
     { status: 500 }
