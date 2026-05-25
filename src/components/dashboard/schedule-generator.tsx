@@ -154,17 +154,43 @@ export function ScheduleGenerator({
         body: JSON.stringify({ examDate, weeklyHours, weakSubjects, subjectProgress, recentSessions, notes: notes.trim() || undefined }),
       })
 
-      let data: GeneratedSchedule & { error?: string }
-      try {
-        data = await res.json()
-      } catch {
-        setError('The server took too long to respond. Please try again.')
+      if (!res.ok || !res.body) {
+        setError('Failed to reach the AI. Please try again.')
         setLoading(false)
         return
       }
 
-      if (!res.ok) {
-        setError(data.error ?? 'Something went wrong. Please try again.')
+      // Read the stream and accumulate text
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulated = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        accumulated += decoder.decode(value, { stream: true })
+      }
+
+      if (accumulated.includes('__ERROR__')) {
+        setError('The AI encountered an error. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Parse the accumulated JSON
+      let parsed: GeneratedSchedule | null = null
+      const candidates = [
+        accumulated.trim(),
+        accumulated.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
+        (accumulated.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
+      ]
+      for (const c of candidates) {
+        if (!c) continue
+        try { parsed = JSON.parse(c); break } catch { /* try next */ }
+      }
+
+      if (!parsed) {
+        setError('Could not read the AI response. Please try again.')
         setLoading(false)
         return
       }
@@ -174,12 +200,12 @@ export function ScheduleGenerator({
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         await supabase.from('study_schedules').upsert(
-          { user_id: user.id, week_start: weekStart, schedule: data, created_at: new Date().toISOString() },
+          { user_id: user.id, week_start: weekStart, schedule: parsed, created_at: new Date().toISOString() },
           { onConflict: 'user_id,week_start' }
         )
       }
 
-      setSchedule(data)
+      setSchedule(parsed)
       setSavedAt(new Date().toISOString())
       setShowRegenForm(false)
       setNotes('')
