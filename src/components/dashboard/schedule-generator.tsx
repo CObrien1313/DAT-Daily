@@ -30,6 +30,14 @@ interface GeneratedSchedule {
   weeklyPlan: DayPlan[]
 }
 
+interface RecentSession {
+  subject: string
+  duration_minutes: number
+  date: string
+  confidence: number | null
+  productivity: number | null
+}
+
 interface ScheduleGeneratorProps {
   examDate: string | null
   weeklyHours: number
@@ -37,6 +45,7 @@ interface ScheduleGeneratorProps {
   weekStart: string
   existingSchedule: GeneratedSchedule | null
   generatedAt: string | null
+  recentSessions: RecentSession[]
 }
 
 const SUBJECT_BADGE_VARIANT: Record<DATSubject, 'default' | 'success' | 'info' | 'warning'> = {
@@ -114,6 +123,7 @@ export function ScheduleGenerator({
   weekStart,
   existingSchedule,
   generatedAt,
+  recentSessions,
 }: ScheduleGeneratorProps) {
   const [weakSubjects, setWeakSubjects] = useState<DATSubject[]>([])
   const [notes, setNotes] = useState('')
@@ -141,7 +151,7 @@ export function ScheduleGenerator({
       const res = await fetch('/api/generate-schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ examDate, weeklyHours, weakSubjects, subjectProgress, notes: notes.trim() || undefined }),
+        body: JSON.stringify({ examDate, weeklyHours, weakSubjects, subjectProgress, recentSessions, notes: notes.trim() || undefined }),
       })
 
       let data: GeneratedSchedule & { error?: string }

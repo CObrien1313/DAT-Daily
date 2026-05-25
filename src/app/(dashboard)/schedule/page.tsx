@@ -11,7 +11,9 @@ export default async function SchedulePage() {
 
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
-  const [{ data: profile }, { data: rawProgress }, { data: savedSchedule }] = await Promise.all([
+  const twoWeeksAgo = format(new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+
+  const [{ data: profile }, { data: rawProgress }, { data: savedSchedule }, { data: rawSessions }] = await Promise.all([
     supabase.from('profiles').select('exam_date, weekly_hours_goal').eq('id', user.id).single(),
     supabase.from('subject_progress').select('subject, progress').eq('user_id', user.id),
     supabase
@@ -20,6 +22,12 @@ export default async function SchedulePage() {
       .eq('user_id', user.id)
       .eq('week_start', weekStart)
       .single(),
+    supabase
+      .from('study_sessions')
+      .select('subject, duration_minutes, date, confidence, productivity')
+      .eq('user_id', user.id)
+      .gte('date', twoWeeksAgo)
+      .order('date', { ascending: false }),
   ])
 
   const subjectProgress: SubjectProgress[] = (rawProgress ?? []).map((sp) => ({
@@ -42,6 +50,7 @@ export default async function SchedulePage() {
         weekStart={weekStart}
         existingSchedule={savedSchedule?.schedule ?? null}
         generatedAt={savedSchedule?.created_at ?? null}
+        recentSessions={rawSessions ?? []}
       />
     </div>
   )

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, X, Loader2, CheckCircle2 } from 'lucide-react'
+import { Plus, X, Loader2, CheckCircle2, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -10,6 +10,49 @@ import { DAT_SUBJECTS } from '@/lib/types'
 import type { DATSubject } from '@/lib/types'
 
 const DURATION_PRESETS = [25, 45, 60, 90]
+
+function StarRating({
+  value,
+  onChange,
+  label,
+}: {
+  value: number
+  onChange: (v: number) => void
+  label: string
+}) {
+  const [hovered, setHovered] = useState(0)
+  return (
+    <div>
+      <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => onChange(star)}
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(0)}
+            className="p-0.5 transition-transform hover:scale-110"
+          >
+            <Star
+              className={cn(
+                'w-6 h-6 transition-colors',
+                star <= (hovered || value)
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'text-slate-200'
+              )}
+            />
+          </button>
+        ))}
+        {value > 0 && (
+          <span className="ml-1 text-xs text-slate-400 self-center">
+            {value}/5
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export function LogSessionModal() {
   const router = useRouter()
@@ -19,6 +62,9 @@ export function LogSessionModal() {
   const [customMinutes, setCustomMinutes] = useState('')
   const [useCustom, setUseCustom] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [confidence, setConfidence] = useState(0)
+  const [productivity, setProductivity] = useState(0)
+  const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -36,6 +82,9 @@ export function LogSessionModal() {
     setCustomMinutes('')
     setUseCustom(false)
     setDate(new Date().toISOString().split('T')[0])
+    setConfidence(0)
+    setProductivity(0)
+    setNotes('')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -52,6 +101,9 @@ export function LogSessionModal() {
       subject,
       duration_minutes: effectiveMinutes,
       date,
+      confidence: confidence || null,
+      productivity: productivity || null,
+      notes: notes.trim() || null,
     })
 
     // Bump subject progress: +1% per 30 min, min 1%, cap at 100
@@ -75,10 +127,7 @@ export function LogSessionModal() {
     setSaving(false)
     setSaved(true)
     router.refresh()
-
-    setTimeout(() => {
-      handleClose()
-    }, 800)
+    setTimeout(() => handleClose(), 800)
   }
 
   const inputClass =
@@ -97,7 +146,7 @@ export function LogSessionModal() {
           onClick={handleClose}
         >
           <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-xl"
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -153,15 +202,9 @@ export function LogSessionModal() {
                     value={customMinutes}
                     min={1}
                     max={480}
-                    onChange={(e) => {
-                      setCustomMinutes(e.target.value)
-                      setUseCustom(true)
-                    }}
+                    onChange={(e) => { setCustomMinutes(e.target.value); setUseCustom(true) }}
                     onFocus={() => setUseCustom(true)}
-                    className={cn(
-                      inputClass,
-                      useCustom && 'ring-2 ring-indigo-500 border-transparent'
-                    )}
+                    className={cn(inputClass, useCustom && 'ring-2 ring-indigo-500 border-transparent')}
                   />
                   <span className="text-sm text-slate-500 whitespace-nowrap">min</span>
                 </div>
@@ -176,6 +219,34 @@ export function LogSessionModal() {
                   max={new Date().toISOString().split('T')[0]}
                   onChange={(e) => setDate(e.target.value)}
                   className={inputClass}
+                />
+              </div>
+
+              {/* Confidence */}
+              <StarRating
+                value={confidence}
+                onChange={setConfidence}
+                label="Confidence after session"
+              />
+
+              {/* Productivity */}
+              <StarRating
+                value={productivity}
+                onChange={setProductivity}
+                label="Productivity rating"
+              />
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Notes <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="What did you cover? Any struggles?"
+                  rows={2}
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white resize-none"
                 />
               </div>
 
