@@ -35,6 +35,7 @@ export function TaskList({ initialTasks, date }: TaskListProps) {
   const [newTitle, setNewTitle] = useState('')
   const [newSubject, setNewSubject] = useState<DATSubject>('Biology')
   const [newMinutes, setNewMinutes] = useState(30)
+  const [newDate, setNewDate] = useState(taskDate)
   const [adding, setAdding] = useState(false)
 
   const completed = tasks.filter((t) => t.completed).length
@@ -71,7 +72,7 @@ export function TaskList({ initialTasks, date }: TaskListProps) {
         title: newTitle.trim(),
         subject: newSubject,
         estimated_minutes: newMinutes,
-        date: taskDate,
+        date: newDate,
         completed: false,
       })
       .select()
@@ -95,6 +96,7 @@ export function TaskList({ initialTasks, date }: TaskListProps) {
     setNewTitle('')
     setNewSubject('Biology')
     setNewMinutes(30)
+    setNewDate(taskDate)
     setShowForm(false)
     setAdding(false)
     router.refresh()
@@ -157,6 +159,15 @@ export function TaskList({ initialTasks, date }: TaskListProps) {
                 />
                 <span className="text-xs text-slate-500">min</span>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-slate-500 whitespace-nowrap">Date</label>
+              <input
+                type="date"
+                value={newDate}
+                onChange={(e) => setNewDate(e.target.value)}
+                className={cn(inputClass, 'flex-1')}
+              />
             </div>
             <div className="flex gap-2">
               <Button type="submit" size="sm" disabled={adding}>

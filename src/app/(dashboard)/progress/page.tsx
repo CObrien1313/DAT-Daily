@@ -1,19 +1,9 @@
 import { redirect } from 'next/navigation'
-import { format, parseISO } from 'date-fns'
 import { createClient } from '@/lib/supabase/server'
 import { SubjectProgressEditor } from '@/components/dashboard/subject-progress-editor'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import type { SubjectProgress, DATSubject } from '@/lib/types'
-
-const SUBJECT_BADGE_VARIANT: Record<DATSubject, 'default' | 'success' | 'info' | 'warning'> = {
-  Biology: 'success',
-  'General Chemistry': 'info',
-  'Organic Chemistry': 'default',
-  PAT: 'warning',
-  'Reading Comprehension': 'info',
-  'Quantitative Reasoning': 'default',
-}
+import { SessionHistory } from '@/components/dashboard/session-history'
+import { Card, CardContent } from '@/components/ui/card'
+import type { SubjectProgress } from '@/lib/types'
 
 export default async function ProgressPage() {
   const supabase = await createClient()
@@ -24,7 +14,7 @@ export default async function ProgressPage() {
     supabase.from('subject_progress').select('subject, progress').eq('user_id', user.id),
     supabase
       .from('study_sessions')
-      .select('id, subject, duration_minutes, date')
+      .select('id, subject, duration_minutes, date, confidence, productivity, notes')
       .eq('user_id', user.id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -51,40 +41,12 @@ export default async function ProgressPage() {
       <div className="space-y-6">
         <SubjectProgressEditor initialSubjects={subjects} />
 
-        {/* Session history */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Study History</CardTitle>
-              <span className="text-sm text-slate-500 font-normal">
-                {totalHours}h logged total
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {(rawSessions ?? []).length === 0 ? (
-              <p className="text-sm text-slate-400 py-4 text-center">
-                No sessions logged yet. Use the &quot;Log Session&quot; button on your dashboard!
-              </p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {(rawSessions ?? []).map((s) => (
-                  <li key={s.id} className="flex items-center justify-between py-3">
-                    <div className="flex items-center gap-3">
-                      <Badge variant={SUBJECT_BADGE_VARIANT[s.subject as DATSubject] ?? 'default'}>
-                        {s.subject}
-                      </Badge>
-                      <span className="text-sm text-slate-600">
-                        {format(parseISO(s.date + 'T12:00:00'), 'MMM d, yyyy')}
-                      </span>
-                    </div>
-                    <span className="text-sm font-medium text-slate-700">
-                      {s.duration_minutes}m
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <CardContent className="pt-6">
+            <SessionHistory
+              sessions={rawSessions ?? []}
+              totalHours={totalHours}
+            />
           </CardContent>
         </Card>
       </div>
