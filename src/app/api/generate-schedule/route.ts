@@ -8,6 +8,7 @@ interface GenerateScheduleBody {
   weeklyHours: number
   weakSubjects: string[]
   subjectProgress: { subject: string; progress: number }[]
+  notes?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body: GenerateScheduleBody = await request.json()
-  const { examDate, weeklyHours, weakSubjects, subjectProgress } = body
+  const { examDate, weeklyHours, weakSubjects, subjectProgress, notes } = body
 
   const daysUntilExam = examDate
     ? Math.max(0, Math.ceil((new Date(examDate + 'T12:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -43,7 +44,7 @@ Keep every task description to one short sentence (under 15 words).`,
 ${daysUntilExam !== null ? `Days until exam: ${daysUntilExam}` : 'Exam date: unknown (plan for 90 days out)'}
 Weekly hours: ${weeklyHours}
 Weak subjects: ${weakSubjects.length > 0 ? weakSubjects.join(', ') : 'none'}
-Progress: ${subjectProgress.map((s) => `${s.subject} ${s.progress}%`).join(', ')}
+Progress: ${subjectProgress.map((s) => `${s.subject} ${s.progress}%`).join(', ')}${notes ? `\nExtra instructions: ${notes}` : ''}
 
 JSON format:
 {"weeklyTip":"string","prioritySubjects":["s1","s2"],"weeklyPlan":[{"day":"Monday","totalMinutes":120,"tasks":[{"subject":"Biology","topic":"Cell Division","durationMinutes":60,"description":"Short one-sentence description."}]}]}`,
