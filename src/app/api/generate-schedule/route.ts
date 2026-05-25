@@ -23,58 +23,55 @@ interface GenerateScheduleBody {
 function buildSessionSummary(sessions: RecentSession[]): string {
   if (sessions.length === 0) return 'No recent sessions logged yet.'
 
-  // Group by subject
-  const bySubject: Record<string, { count: number; totalMin: number; avgConf: number; avgProd: number; lastDate: string }> = {}
+  const DAT_SUBJECTS = ['Biology', 'General Chemistry', 'Organic Chemistry', 'PAT', 'Reading Comprehension', 'Quantitative Reasoning']
+  const bySubject: Record<string, { count: number; totalMin: number; confScores: number[]; prodScores: number[] }> = {}
+
   for (const s of sessions) {
-    if (!bySubject[s.subject]) {
-      bySubject[s.subject] = { count: 0, totalMin: 0, avgConf: 0, avgProd: 0, lastDate: s.date }
-    }
-    const g = bySubject[s.subject]
-    g.count++
-    g.totalMin += s.duration_minutes
-    if (s.confidence) g.avgConf += s.confidence
-    if (s.productivity) g.avgProd += s.productivity
-    if (s.date > g.lastDate) g.lastDate = s.date
+    if (!bySubject[s.subject]) bySubject[s.subject] = { count: 0, totalMin: 0, confScores: [], prodScores: [] }
+    bySubject[s.subject].count++
+    bySubject[s.subject].totalMin += s.duration_minutes
+    if (s.confidence) bySubject[s.subject].confScores.push(s.confidence)
+    if (s.productivity) bySubject[s.subject].prodScores.push(s.productivity)
   }
 
-  const DAT_SUBJECTS = ['Biology', 'General Chemistry', 'Organic Chemistry', 'PAT', 'Reading Comprehension', 'Quantitative Reasoning']
-  const studiedSubjects = Object.keys(bySubject)
-  const unstudied = DAT_SUBJECTS.filter((s) => !studiedSubjects.includes(s))
-
+  const unstudied = DAT_SUBJECTS.filter((s) => !bySubject[s])
   const lines: string[] = []
 
   for (const [subject, g] of Object.entries(bySubject)) {
-    const confSessions = sessions.filter((s) => s.subject === subject && s.confidence)
-    const prodSessions = sessions.filter((s) => s.subject === subject && s.productivity)
-    const avgConf = confSessions.length > 0 ? (confSessions.reduce((a, s) => a + (s.confidence ?? 0), 0) / confSessions.length).toFixed(1) : null
-    const avgProd = prodSessions.length > 0 ? (prodSessions.reduce((a, s) => a + (s.productivity ?? 0), 0) / prodSessions.length).toFixed(1) : null
-
+    const avgConf = g.confScores.length > 0 ? (g.confScores.reduce((a, b) => a + b, 0) / g.confScores.length).toFixed(1) : null
+    const avgProd = g.prodScores.length > 0 ? (g.prodScores.reduce((a, b) => a + b, 0) / g.prodScores.length).toFixed(1) : null
     const flags: string[] = []
-    if (avgConf && Number(avgConf) <= 2.5) flags.push('LOW CONFIDENCE — prioritize')
-    if (avgConf && Number(avgConf) >= 4.5) flags.push('high confidence')
+    if (avgConf && Number(avgConf) <= 2.5) flags.push('LOW CONFIDENCE — prioritize heavily')
+    if (avgConf && Number(avgConf) >= 4.5) flags.push('high confidence — reduce time')
     if (avgProd && Number(avgProd) <= 2.5) flags.push('low productivity — try shorter sessions')
-
     lines.push(
-      `- ${subject}: ${g.count} session(s), ${g.totalMin}min total` +
-      (avgConf ? `, confidence avg ${avgConf}/5` : '') +
-      (avgProd ? `, productivity avg ${avgProd}/5` : '') +
+      `- ${subject}: ${g.count} session(s), ${g.totalMin}min` +
+      (avgConf ? `, confidence ${avgConf}/5` : '') +
+      (avgProd ? `, productivity ${avgProd}/5` : '') +
       (flags.length ? ` → ${flags.join(', ')}` : '')
     )
   }
 
-  if (unstudied.length > 0) {
-    lines.push(`- NOT studied recently: ${unstudied.join(', ')} → include these`)
-  }
-
+  if (unstudied.length > 0) lines.push(`- NOT studied recently: ${unstudied.join(', ')} → must include`)
   return lines.join('\n')
+}
+
+function tryParse(text: string): object | null {
+  const candidates = [
+    text.trim(),
+    text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
+    (text.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
+  ]
+  for (const c of candidates) {
+    if (!c) continue
+    try { return JSON.parse(c) } catch { /* try next */ }
+  }
+  return null
 }
 
 export async function POST(request: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json(
-      { error: 'AI schedule generation is not configured.' },
-      { status: 503 }
-    )
+    return NextResponse.json({ error: 'AI schedule generation is not configured.' }, { status: 503 })
   }
 
   const body: GenerateScheduleBody = await request.json()
@@ -86,26 +83,17 @@ export async function POST(request: NextRequest) {
 
   const examPhase =
     daysUntilExam === null ? 'early prep'
-    : daysUntilExam > 90 ? 'early prep — focus on content review and foundations'
-    : daysUntilExam > 30 ? 'mid prep — balance content review with timed practice'
-    : 'exam crunch — prioritize timed practice sections and weak areas'
+    : daysUntilExam > 90 ? 'early prep — focus on content review'
+    : daysUntilExam > 30 ? 'mid prep — balance review with timed practice'
+    : 'exam crunch — prioritize timed practice and weak areas'
 
   const sessionSummary = buildSessionSummary(recentSessions)
 
-  const client = new Anthropic()
-
-  let raw = ''
-  try {
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system: `You are a DAT study coach. Return ONLY a JSON object — no markdown, no explanation.
+  const systemPrompt = `You are a DAT study coach. Output ONLY raw JSON — no markdown fences, no explanation, no text before or after the JSON object.
 DAT subjects: Biology, General Chemistry, Organic Chemistry, PAT, Reading Comprehension, Quantitative Reasoning.
-Rules: spread study across 7 days, heavily weight low-confidence and unstudied subjects, include PAT every day, no break entries as tasks, keep descriptions under 15 words.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Create an adaptive 7-day DAT study schedule.
+Rules: spread study across 7 days, heavily weight low-confidence and unstudied subjects, include PAT every day, no break entries as tasks, keep descriptions under 15 words.`
+
+  const userPrompt = `Create an adaptive 7-day DAT study schedule.
 
 STUDENT PROFILE:
 - Exam phase: ${examPhase}${daysUntilExam !== null ? ` (${daysUntilExam} days left)` : ''}
@@ -113,44 +101,39 @@ STUDENT PROFILE:
 - Subject progress: ${subjectProgress.map((s) => `${s.subject} ${s.progress}%`).join(', ')}
 - Flagged weak areas: ${weakSubjects.length > 0 ? weakSubjects.join(', ') : 'none'}
 
-RECENT SESSION DATA (last 14 days — use this to adapt the schedule):
+RECENT SESSION DATA (last 14 days):
 ${sessionSummary}
 ${notes ? `\nSTUDENT INSTRUCTIONS: ${notes}` : ''}
 
-Adapt the schedule based on the session data: increase time for low-confidence or skipped subjects, reduce time for high-confidence subjects, shift to practice mode if exam is near.
+Return this JSON shape and nothing else:
+{"weeklyTip":"string","prioritySubjects":["s1","s2"],"weeklyPlan":[{"day":"Monday","totalMinutes":120,"tasks":[{"subject":"Biology","topic":"Cell Division","durationMinutes":60,"description":"One sentence under 15 words."}]}]}`
 
-JSON format:
-{"weeklyTip":"string","prioritySubjects":["s1","s2"],"weeklyPlan":[{"day":"Monday","totalMinutes":120,"tasks":[{"subject":"Biology","topic":"Cell Division","durationMinutes":60,"description":"Short one-sentence description."}]}]}`,
-        },
-      ],
-    })
-    raw = message.content[0].type === 'text' ? message.content[0].text : ''
-  } catch (err) {
-    console.error('[generate-schedule] API error:', err)
-    return NextResponse.json(
-      { error: 'Failed to reach the AI. Please try again.' },
-      { status: 502 }
-    )
-  }
+  const client = new Anthropic()
 
-  const candidates = [
-    raw.trim(),
-    raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
-    (raw.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
-  ]
-
-  for (const candidate of candidates) {
-    if (!candidate) continue
+  // Try up to 2 times in case of a bad response
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let raw = ''
     try {
-      return NextResponse.json(JSON.parse(candidate))
-    } catch {
-      // try next candidate
+      const message = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+      raw = message.content[0].type === 'text' ? message.content[0].text : ''
+    } catch (err) {
+      console.error(`[generate-schedule] API error attempt ${attempt + 1}:`, err)
+      if (attempt === 1) {
+        return NextResponse.json({ error: 'Failed to reach the AI. Please try again.' }, { status: 502 })
+      }
+      continue
     }
+
+    const parsed = tryParse(raw)
+    if (parsed) return NextResponse.json(parsed)
+
+    console.error(`[generate-schedule] Parse failed attempt ${attempt + 1}:`, raw.slice(0, 200))
   }
 
-  console.error('[generate-schedule] Could not parse:', raw)
-  return NextResponse.json(
-    { error: 'Could not parse the AI response. Please try again.' },
-    { status: 500 }
-  )
+  return NextResponse.json({ error: 'Could not generate a valid schedule. Please try again.' }, { status: 500 })
 }
