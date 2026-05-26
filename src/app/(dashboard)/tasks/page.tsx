@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+
+export const dynamic = 'force-dynamic'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateNavigator } from '@/components/dashboard/date-navigator'
 import type { StudyTask } from '@/lib/types'
@@ -46,7 +48,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         <DateNavigator date={date} />
       </div>
 
-      <TaskList initialTasks={tasks} date={date} />
+      <TaskList key={date} initialTasks={tasks} date={date} />
     </div>
   )
 }

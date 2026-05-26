@@ -72,9 +72,9 @@ export function DateNavigator({ date }: DateNavigatorProps) {
       {!isToday && (
         <button
           onClick={() => router.push('/tasks')}
-          className="ml-2 text-xs text-indigo-600 hover:underline font-medium"
+          className="ml-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
         >
-          ↩ Today
+          Today
         </button>
       )}
     </div>
