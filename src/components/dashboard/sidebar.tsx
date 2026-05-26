@@ -9,6 +9,7 @@ import {
   Calendar,
   BarChart3,
   TrendingUp,
+  CircleHelp,
   Settings,
   BookOpen,
   Menu,
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/schedule', label: 'Schedule', icon: Calendar },
   { href: '/progress', label: 'Progress', icon: BarChart3 },
   { href: '/insights', label: 'Insights', icon: TrendingUp },
+  { href: '/questions', label: 'Daily Question', icon: CircleHelp },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

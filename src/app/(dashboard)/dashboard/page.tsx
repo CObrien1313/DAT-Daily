@@ -11,7 +11,7 @@ import { SubjectProgressCard } from '@/components/dashboard/subject-progress-car
 import { WeakTopicsCard } from '@/components/dashboard/weak-topics-card'
 import { LogSessionModal } from '@/components/dashboard/log-session-modal'
 import { DashboardGreeting } from '@/components/dashboard/dashboard-greeting'
-import { DailyQuestionCard } from '@/components/dashboard/daily-question-card'
+import { DailyQuestionStreakCard } from '@/components/dashboard/daily-question-streak-card'
 import { getQuestionDate, calcQuestionStreak } from '@/lib/question-date'
 import type { StudyTask, SubjectProgress, WeakTopic } from '@/lib/types'
 
@@ -36,8 +36,6 @@ export default async function DashboardPage() {
     { data: rawProgress },
     { data: rawWeakTopics },
     { data: rawSessions },
-    { data: dailyQuestion },
-    { data: userAnswer },
     { data: allAnswers },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
@@ -45,8 +43,6 @@ export default async function DashboardPage() {
     supabase.from('subject_progress').select('*').eq('user_id', user.id),
     supabase.from('weak_topics').select('*').eq('user_id', user.id).eq('resolved', false).order('created_at', { ascending: false }),
     supabase.from('study_sessions').select('date, duration_minutes').eq('user_id', user.id).order('date', { ascending: false }),
-    supabase.from('daily_questions').select('*').eq('question_date', questionDate).single(),
-    supabase.from('daily_question_answers').select('selected_option, is_correct').eq('user_id', user.id).eq('question_date', questionDate).single(),
     supabase.from('daily_question_answers').select('question_date, is_correct').eq('user_id', user.id),
   ])
 
@@ -143,12 +139,17 @@ export default async function DashboardPage() {
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StreakCard streakDays={streakDays} longestStreak={streakDays} />
         <CountdownCard examDate={profile?.exam_date ?? null} />
         <WeeklyHoursCard
           completedHours={weeklyHours}
           goalHours={profile?.weekly_hours_goal ?? 30}
+        />
+        <DailyQuestionStreakCard
+          questionStreak={questionStreak}
+          totalCorrect={totalCorrect}
+          totalWrong={totalWrong}
         />
       </div>
 
@@ -164,19 +165,6 @@ export default async function DashboardPage() {
 
       {/* Weak topics */}
       <WeakTopicsCard initialTopics={weakTopics} />
-
-      {/* Daily DAT question */}
-      <div className="mt-4">
-        <DailyQuestionCard
-          questionDate={questionDate}
-          userId={user.id}
-          initialQuestion={dailyQuestion ?? null}
-          initialAnswer={userAnswer ?? null}
-          totalCorrect={totalCorrect}
-          totalWrong={totalWrong}
-          questionStreak={questionStreak}
-        />
-      </div>
     </div>
   )
 }

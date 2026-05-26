@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Loader2, CheckCircle2, XCircle, Flame } from 'lucide-react'
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
-import type { DATSubject } from '@/lib/types'
 
 const SUBJECT_BADGE_VARIANT: Record<string, 'default' | 'success' | 'info' | 'warning'> = {
   Biology: 'success',
@@ -40,9 +39,6 @@ interface DailyQuestionCardProps {
   userId: string
   initialQuestion: DailyQuestion | null
   initialAnswer: UserAnswer | null
-  totalCorrect: number
-  totalWrong: number
-  questionStreak: number
 }
 
 const OPTIONS = ['a', 'b', 'c', 'd'] as const
@@ -57,9 +53,6 @@ export function DailyQuestionCard({
   userId,
   initialQuestion,
   initialAnswer,
-  totalCorrect,
-  totalWrong,
-  questionStreak,
 }: DailyQuestionCardProps) {
   const [question, setQuestion] = useState<DailyQuestion | null>(initialQuestion)
   const [fetchState, setFetchState] = useState<'idle' | 'loading' | 'error'>(
@@ -69,8 +62,6 @@ export function DailyQuestionCard({
   const [submitted, setSubmitted] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [liveCorrect, setLiveCorrect] = useState(totalCorrect)
-  const [liveWrong, setLiveWrong] = useState(totalWrong)
 
   const alreadyAnswered = initialAnswer !== null
 
@@ -104,32 +95,9 @@ export function DailyQuestionCard({
       is_correct: correct,
     })
 
-    if (correct) setLiveCorrect((n) => n + 1)
-    else setLiveWrong((n) => n + 1)
-
     setSaving(false)
     setSubmitted(true)
   }
-
-  // ── Shared stats bar ───────────────────────────────────────────────────────
-  const statsBar = (
-    <div className="flex items-center gap-4 mt-1 text-xs text-slate-500">
-      <span className="flex items-center gap-1">
-        <Flame className={cn('w-3.5 h-3.5', questionStreak > 0 ? 'text-orange-500' : 'text-slate-300')} />
-        <span className={questionStreak > 0 ? 'text-orange-500 font-semibold' : ''}>
-          {questionStreak} day streak
-        </span>
-      </span>
-      <span className="flex items-center gap-1 text-emerald-600 font-medium">
-        <CheckCircle2 className="w-3.5 h-3.5" />
-        {liveCorrect} correct
-      </span>
-      <span className="flex items-center gap-1 text-red-500 font-medium">
-        <XCircle className="w-3.5 h-3.5" />
-        {liveWrong} wrong
-      </span>
-    </div>
-  )
 
   // ── Option row renderer ────────────────────────────────────────────────────
   function ResultOption({ opt, userOpt }: { opt: Option; userOpt: Option | null }) {
@@ -158,18 +126,17 @@ export function DailyQuestionCard({
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <CardTitle>Daily DAT Question</CardTitle>
-            {question && (
-              <Badge variant={SUBJECT_BADGE_VARIANT[question.subject] ?? 'default'}>
-                {question.subject}
-              </Badge>
-            )}
-          </div>
-          <span className="text-xs text-slate-400">Resets 8 AM ET daily</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <CardTitle>Today&apos;s Question</CardTitle>
+          {question && (
+            <Badge variant={SUBJECT_BADGE_VARIANT[question.subject] ?? 'default'}>
+              {question.subject}
+            </Badge>
+          )}
         </div>
-        {statsBar}
+        {question && (
+          <p className="text-xs text-slate-400 mt-0.5">Resets 8 AM ET daily</p>
+        )}
       </CardHeader>
 
       <CardContent className="pt-0">
@@ -191,6 +158,7 @@ export function DailyQuestionCard({
         {/* Already answered — show result */}
         {question && alreadyAnswered && !submitted && (
           <div className="space-y-3">
+            <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">Testing: {question.subject}</p>
             <p className="text-sm font-medium text-slate-800 leading-relaxed">{question.question}</p>
             <div className="space-y-2">
               {OPTIONS.map((opt) => (
@@ -213,6 +181,7 @@ export function DailyQuestionCard({
         {/* Unanswered — interactive */}
         {question && !alreadyAnswered && !submitted && (
           <div className="space-y-3">
+            <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">Testing: {question.subject}</p>
             <p className="text-sm font-medium text-slate-800 leading-relaxed">{question.question}</p>
             <div className="space-y-2">
               {OPTIONS.map((opt) => (
@@ -246,6 +215,7 @@ export function DailyQuestionCard({
         {/* Just submitted — show result */}
         {question && submitted && (
           <div className="space-y-3">
+            <p className="text-xs font-bold text-indigo-600 uppercase tracking-wide">Testing: {question.subject}</p>
             <p className="text-sm font-medium text-slate-800 leading-relaxed">{question.question}</p>
             <div className="space-y-2">
               {OPTIONS.map((opt) => (
