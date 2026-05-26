@@ -9,18 +9,29 @@ interface StreakCardProps {
 
 export function StreakCard({ streakDays, longestStreak }: StreakCardProps) {
   const isHot = streakDays >= 7
+  const isActive = streakDays > 0
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Study Streak</CardTitle>
-          <Flame className={cn('w-4 h-4', isHot ? 'text-orange-500' : 'text-slate-400')} />
+          <Flame
+            className={cn(
+              'w-4 h-4 transition-colors',
+              isHot ? 'text-orange-500 animate-bounce' : isActive ? 'text-orange-400' : 'text-slate-300'
+            )}
+          />
         </div>
       </CardHeader>
       <CardContent>
         <div className="flex items-end gap-1 mb-1">
-          <span className={cn('text-5xl font-extrabold leading-none', isHot ? 'text-orange-500' : 'text-slate-700')}>
+          <span
+            className={cn(
+              'text-5xl font-extrabold leading-none tabular-nums transition-colors',
+              isHot ? 'text-orange-500' : isActive ? 'text-slate-700' : 'text-slate-300'
+            )}
+          >
             {streakDays}
           </span>
           <span className="text-slate-500 text-sm mb-1.5 ml-1">
@@ -29,12 +40,20 @@ export function StreakCard({ streakDays, longestStreak }: StreakCardProps) {
         </div>
         <p className="text-sm text-slate-500">
           {streakDays === 0
-            ? 'Start studying to begin your streak!'
+            ? 'Log a session to start your streak!'
+            : streakDays >= 30
+            ? '🏆 Legendary. Absolutely unstoppable.'
+            : streakDays >= 14
+            ? '🔥 Two weeks straight — elite territory!'
             : streakDays >= 7
-            ? '🔥 You\'re on fire! Keep it up.'
+            ? "🔥 You're on fire! Keep it up."
+            : streakDays >= 3
+            ? '⚡ Building momentum — don\'t stop now!'
             : 'Keep going — don\'t break the chain!'}
         </p>
-        <p className="text-xs text-slate-400 mt-1">Personal best: {longestStreak} days</p>
+        {longestStreak > 0 && (
+          <p className="text-xs text-slate-400 mt-1">Personal best: {longestStreak} days</p>
+        )}
       </CardContent>
     </Card>
   )

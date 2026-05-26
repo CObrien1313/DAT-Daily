@@ -67,6 +67,7 @@ export function LogSessionModal() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [milestone, setMilestone] = useState<string | null>(null)
 
   const effectiveMinutes = useCustom ? Number(customMinutes) || 0 : minutes
 
@@ -124,10 +125,29 @@ export function LogSessionModal() {
         .eq('subject', subject)
     }
 
+    // Check for total-hours milestones
+    const { data: allSessions } = await supabase
+      .from('study_sessions')
+      .select('duration_minutes')
+      .eq('user_id', user.id)
+    const totalMins = (allSessions ?? []).reduce((s, r) => s + r.duration_minutes, 0)
+    const totalHours = totalMins / 60
+    const MILESTONES = [
+      { hours: 1,   msg: '🎉 First hour logged! Your journey begins.' },
+      { hours: 10,  msg: '⚡ 10 hours down! You\'re building real momentum.' },
+      { hours: 25,  msg: '🔥 25 hours! A quarter of the way to exam-ready.' },
+      { hours: 50,  msg: '🏅 50 hours of studying — incredible dedication!' },
+      { hours: 100, msg: '🏆 100 hours! You\'re in elite prep territory.' },
+      { hours: 200, msg: '🚀 200 hours! You\'re basically a DAT machine.' },
+    ]
+    const prevHours = (totalMins - effectiveMinutes) / 60
+    const hit = MILESTONES.find((m) => prevHours < m.hours && totalHours >= m.hours)
+    if (hit) setMilestone(hit.msg)
+
     setSaving(false)
     setSaved(true)
     router.refresh()
-    setTimeout(() => handleClose(), 800)
+    if (!hit) setTimeout(() => handleClose(), 800)
   }
 
   const inputClass =
@@ -250,21 +270,33 @@ export function LogSessionModal() {
                 />
               </div>
 
+              {/* Milestone celebration */}
+              {milestone && (
+                <div className="flex flex-col items-center gap-3 py-4 text-center">
+                  <p className="text-base font-semibold text-slate-900">{milestone}</p>
+                  <Button onClick={handleClose} className="w-full">
+                    Keep it up! 💪
+                  </Button>
+                </div>
+              )}
+
               {/* Actions */}
-              <div className="flex items-center gap-3 pt-1">
-                <Button
-                  type="submit"
-                  disabled={saving || saved || effectiveMinutes < 1}
-                  className="flex-1"
-                >
-                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {saved && <CheckCircle2 className="w-4 h-4" />}
-                  {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Session'}
-                </Button>
-                <Button type="button" variant="ghost" onClick={handleClose}>
-                  Cancel
-                </Button>
-              </div>
+              {!milestone && (
+                <div className="flex items-center gap-3 pt-1">
+                  <Button
+                    type="submit"
+                    disabled={saving || saved || effectiveMinutes < 1}
+                    className="flex-1"
+                  >
+                    {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {saved && <CheckCircle2 className="w-4 h-4" />}
+                    {saving ? 'Saving…' : saved ? 'Saved!' : 'Save Session'}
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={handleClose}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
             </form>
           </div>
         </div>

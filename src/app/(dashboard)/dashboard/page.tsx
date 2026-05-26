@@ -18,6 +18,10 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Check onboarding first
+  const { data: profileCheck } = await supabase.from('profiles').select('onboarded').eq('id', user.id).single()
+  if (profileCheck && profileCheck.onboarded === false) redirect('/onboarding')
+
   const _now = new Date()
   const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
 
@@ -41,10 +45,14 @@ export default async function DashboardPage() {
 
   // Weekly hours (Mon–Sun)
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
-  const weeklyMinutes = (rawSessions ?? [])
-    .filter((s) => new Date(s.date + 'T12:00:00') >= weekStart)
-    .reduce((sum, s) => sum + s.duration_minutes, 0)
+  const thisWeekSessions = (rawSessions ?? []).filter(
+    (s) => new Date(s.date + 'T12:00:00') >= weekStart
+  )
+  const weeklyMinutes = thisWeekSessions.reduce((sum, s) => sum + s.duration_minutes, 0)
   const weeklyHours = Math.round((weeklyMinutes / 60) * 10) / 10
+  const weeklySessionCount = thisWeekSessions.length
+  const weeklyGoal = profile?.weekly_hours_goal ?? 30
+  const weeklyPct = Math.min(100, Math.round((weeklyHours / weeklyGoal) * 100))
 
   // Shape data for components
   const tasks: StudyTask[] = (rawTasks ?? []).map((t) => ({
@@ -92,6 +100,29 @@ export default async function DashboardPage() {
           >
             Go to Settings →
           </Link>
+        </div>
+      )}
+
+      {/* Weekly summary banner — only show if sessions logged this week */}
+      {weeklySessionCount > 0 && (
+        <div className="mb-6 p-4 bg-gradient-to-r from-indigo-600 to-indigo-500 rounded-xl text-white">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="text-sm font-semibold opacity-90">This week</p>
+              <p className="text-xl font-bold mt-0.5">
+                {weeklyHours}h studied across {weeklySessionCount} session{weeklySessionCount !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm opacity-80">{weeklyPct}% of your {weeklyGoal}h goal</p>
+              <div className="mt-1.5 h-2 w-32 bg-white/30 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-white rounded-full transition-all"
+                  style={{ width: `${weeklyPct}%` }}
+                />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
