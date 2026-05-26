@@ -204,6 +204,7 @@ export function OnboardingWizard({ initialName }: { initialName: string }) {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [data, setData] = useState<WizardData>({
     name: initialName,
     examDate: '',
@@ -222,31 +223,47 @@ export function OnboardingWizard({ initialName }: { initialName: string }) {
 
   async function finish() {
     setSaving(true)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
+    setSaveError(null)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setSaving(false); return }
 
-    // Save profile
-    await supabase.from('profiles').update({
-      name: data.name.trim() || initialName,
-      exam_date: data.examDate || null,
-      weekly_hours_goal: data.weeklyHours,
-      schedule_intensity: data.intensity,
-      target_score: data.targetScore,
-      onboarded: true,
-    }).eq('id', user.id)
+      // Save profile — only send columns we know exist
+      const { error: profileError } = await supabase.from('profiles').update({
+        name: data.name.trim() || initialName,
+        exam_date: data.examDate || null,
+        weekly_hours_goal: data.weeklyHours,
+        onboarded: true,
+      }).eq('id', user.id)
 
-    // Pre-populate subject_progress: weak subjects start at 15%, others at 40%
-    const allSubjects = DAT_SUBJECTS
-    const upserts = allSubjects.map((subject) => ({
-      user_id: user.id,
-      subject,
-      progress: data.weakSubjects.includes(subject) ? 15 : 40,
-    }))
-    // Only insert rows that don't already exist
-    await supabase.from('subject_progress').upsert(upserts, { onConflict: 'user_id,subject', ignoreDuplicates: true })
+      if (profileError) {
+        setSaveError('Could not save your profile. Please try again.')
+        setSaving(false)
+        return
+      }
 
-    router.replace('/dashboard')
+      // Try saving optional new columns — ignore errors if columns don't exist yet
+      await supabase.from('profiles').update({
+        schedule_intensity: data.intensity,
+        target_score: data.targetScore,
+      }).eq('id', user.id)
+
+      // Pre-populate subject_progress for weak subjects only (don't overwrite existing rows)
+      if (data.weakSubjects.length > 0) {
+        const upserts = data.weakSubjects.map((subject) => ({
+          user_id: user.id,
+          subject,
+          progress: 15,
+        }))
+        await supabase.from('subject_progress').upsert(upserts, { onConflict: 'user_id,subject' })
+      }
+
+      router.replace('/dashboard')
+    } catch {
+      setSaveError('Something went wrong. Please try again.')
+      setSaving(false)
+    }
   }
 
   const progress = (step / TOTAL_STEPS) * 100
@@ -322,37 +339,44 @@ export function OnboardingWizard({ initialName }: { initialName: string }) {
                 Back
               </button>
 
-              <div className="flex items-center gap-3">
-                {canSkipExam && !data.examDate && (
-                  <button
-                    onClick={next}
-                    className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    Skip for now
-                  </button>
+              <div className="flex flex-col items-end gap-2">
+                {saveError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                    {saveError}
+                  </p>
                 )}
-                {step < TOTAL_STEPS ? (
-                  <button
-                    onClick={next}
-                    disabled={step === 1 && !data.name.trim()}
-                    className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={finish}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
-                  >
-                    {saving ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" />Setting up…</>
-                    ) : (
-                      <>Let&apos;s go! 🎯</>
-                    )}
-                  </button>
-                )}
+                <div className="flex items-center gap-3">
+                  {canSkipExam && !data.examDate && (
+                    <button
+                      onClick={next}
+                      className="text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      Skip for now
+                    </button>
+                  )}
+                  {step < TOTAL_STEPS ? (
+                    <button
+                      onClick={next}
+                      disabled={step === 1 && !data.name.trim()}
+                      className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={finish}
+                      disabled={saving}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                    >
+                      {saving ? (
+                        <><Loader2 className="w-4 h-4 animate-spin" />Setting up…</>
+                      ) : (
+                        <>Let&apos;s go! 🎯</>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

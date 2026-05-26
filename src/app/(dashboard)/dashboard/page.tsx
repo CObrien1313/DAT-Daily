@@ -20,7 +20,8 @@ export default async function DashboardPage() {
 
   // Check onboarding first
   const { data: profileCheck } = await supabase.from('profiles').select('onboarded').eq('id', user.id).single()
-  if (profileCheck && profileCheck.onboarded === false) redirect('/onboarding')
+  // Only redirect truly new users (onboarded is explicitly false, not null)
+  if (profileCheck?.onboarded === false) redirect('/onboarding')
 
   const _now = new Date()
   const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
