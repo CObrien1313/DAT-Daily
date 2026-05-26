@@ -103,19 +103,16 @@ export function SettingsForm({ profile }: SettingsFormProps) {
             <label className="block text-sm font-medium text-slate-700 mb-1.5">
               Weekly study hours goal
             </label>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <input
-                type="range"
-                min={5}
-                max={60}
-                step={5}
+                type="number"
+                min={1}
+                max={168}
                 value={weeklyHours}
                 onChange={(e) => setWeeklyHours(Number(e.target.value))}
-                className="flex-1 accent-indigo-600"
+                className={inputClass}
               />
-              <span className="text-sm font-semibold text-slate-700 w-12 text-right">
-                {weeklyHours}h/wk
-              </span>
+              <span className="text-sm text-slate-500 whitespace-nowrap">hrs / week</span>
             </div>
             <p className="text-xs text-slate-400 mt-1.5">
               Recommended: 20–35 hours/week for most test schedules.

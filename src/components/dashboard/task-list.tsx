@@ -114,9 +114,8 @@ function TaskRow({ task, onToggle, onUpdate, onDelete }: TaskRowProps) {
                 type="number"
                 value={minutes}
                 onChange={(e) => setMinutes(Number(e.target.value))}
-                min={5}
-                max={300}
-                step={5}
+                min={1}
+                max={600}
                 className={cn(inputClass, 'w-20')}
               />
               <span className="text-xs text-slate-500">min</span>
@@ -342,9 +341,8 @@ export function TaskList({ initialTasks, date }: TaskListProps) {
                   type="number"
                   value={newMinutes}
                   onChange={(e) => setNewMinutes(Number(e.target.value))}
-                  min={5}
-                  max={300}
-                  step={5}
+                  min={1}
+                  max={600}
                   className={cn(inputClass, 'w-20')}
                 />
                 <span className="text-xs text-slate-500">min</span>
