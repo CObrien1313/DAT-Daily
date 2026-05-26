@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateNavigator } from '@/components/dashboard/date-navigator'
+import { TodayRedirect } from '@/components/dashboard/today-redirect'
 import type { StudyTask } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -16,9 +17,30 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   if (!user) redirect('/login')
 
   const { date: dateParam } = await searchParams
-  const now = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  const date = dateParam ?? today
+
+  const pageShell = (
+    <div className="p-4 md:p-8 max-w-3xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">Tasks</h1>
+        <p className="text-sm text-slate-500 mt-1">Manage your daily study tasks.</p>
+      </div>
+    </div>
+  )
+
+  // No date in URL — let the client read device-local date and redirect
+  if (!dateParam) {
+    return (
+      <div className="p-4 md:p-8 max-w-3xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Tasks</h1>
+          <p className="text-sm text-slate-500 mt-1">Manage your daily study tasks.</p>
+        </div>
+        <TodayRedirect />
+      </div>
+    )
+  }
+
+  const date = dateParam
 
   const { data: rawTasks } = await supabase
     .from('study_tasks')
@@ -45,7 +67,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       </div>
 
       <div className="flex justify-center mb-6">
-        <DateNavigator date={date} today={today} />
+        <DateNavigator date={date} />
       </div>
 
       <TaskList key={date} initialTasks={tasks} date={date} />

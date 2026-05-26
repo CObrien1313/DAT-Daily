@@ -5,8 +5,15 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { format, addDays, subDays, parseISO, differenceInCalendarDays } from 'date-fns'
 
 interface DateNavigatorProps {
-  date: string  // yyyy-MM-dd — the currently viewed date
-  today: string // yyyy-MM-dd — passed from the server so client always agrees
+  date: string // yyyy-MM-dd — the currently viewed date (always from URL param)
+}
+
+function localToday(): string {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function dateLabel(date: string, today: string): string {
@@ -20,11 +27,8 @@ function dateLabel(date: string, today: string): string {
   return format(parseISO(date + 'T12:00:00'), 'EEEE')
 }
 
-function toHref(date: string, today: string): string {
-  return date === today ? '/tasks' : `/tasks?date=${date}`
-}
-
-export function DateNavigator({ date, today }: DateNavigatorProps) {
+export function DateNavigator({ date }: DateNavigatorProps) {
+  const today = localToday()
   const current = parseISO(date + 'T12:00:00')
   const isToday = date === today
 
@@ -33,9 +37,8 @@ export function DateNavigator({ date, today }: DateNavigatorProps) {
 
   return (
     <div className="flex items-center gap-2">
-      {/* Back arrow — always enabled, no restriction */}
       <Link
-        href={toHref(prevDate, today)}
+        href={`/tasks?date=${prevDate}`}
         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
         aria-label="Previous day"
       >
@@ -51,19 +54,17 @@ export function DateNavigator({ date, today }: DateNavigatorProps) {
         </p>
       </div>
 
-      {/* Forward arrow — always enabled */}
       <Link
-        href={toHref(nextDate, today)}
+        href={`/tasks?date=${nextDate}`}
         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
         aria-label="Next day"
       >
         <ChevronRight className="w-4 h-4" />
       </Link>
 
-      {/* Today button — only shown when not on today */}
       {!isToday && (
         <Link
-          href="/tasks"
+          href={`/tasks?date=${today}`}
           className="ml-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
         >
           Today
