@@ -14,7 +14,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   if (!user) redirect('/login')
 
   const { date: dateParam } = await searchParams
-  const today = new Date().toISOString().split('T')[0]
+  const now = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const date = dateParam ?? today
 
   const { data: rawTasks } = await supabase
