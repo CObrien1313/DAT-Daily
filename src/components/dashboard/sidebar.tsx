@@ -8,6 +8,7 @@ import {
   CheckSquare,
   Calendar,
   BarChart3,
+  TrendingUp,
   Settings,
   BookOpen,
   Menu,
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/schedule', label: 'Schedule', icon: Calendar },
   { href: '/progress', label: 'Progress', icon: BarChart3 },
+  { href: '/insights', label: 'Insights', icon: TrendingUp },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
