@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-
-export const dynamic = 'force-dynamic'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateNavigator } from '@/components/dashboard/date-navigator'
 import type { StudyTask } from '@/lib/types'
+
+export const dynamic = 'force-dynamic'
 
 interface TasksPageProps {
   searchParams: Promise<{ date?: string }>
@@ -45,7 +45,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       </div>
 
       <div className="flex justify-center mb-6">
-        <DateNavigator date={date} />
+        <DateNavigator date={date} today={today} />
       </div>
 
       <TaskList key={date} initialTasks={tasks} date={date} />
