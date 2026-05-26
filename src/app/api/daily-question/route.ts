@@ -25,21 +25,29 @@ interface GeneratedQuestion {
   explanation: string
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const questionDate = getQuestionDate()
+  const force = new URL(request.url).searchParams.get('force') === 'true'
+
+  // If force-regenerating, delete the cached question first
+  if (force) {
+    await supabase.from('daily_questions').delete().eq('question_date', questionDate)
+  }
 
   // Return existing question if already generated for today
-  const { data: existing } = await supabase
-    .from('daily_questions')
-    .select('*')
-    .eq('question_date', questionDate)
-    .single()
+  if (!force) {
+    const { data: existing } = await supabase
+      .from('daily_questions')
+      .select('*')
+      .eq('question_date', questionDate)
+      .single()
 
-  if (existing) return NextResponse.json(existing)
+    if (existing) return NextResponse.json(existing)
+  }
 
   // Generate a new question with Claude
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -67,12 +75,15 @@ export async function GET() {
       content: `Generate one challenging DAT practice question on the topic: ${subject}.
 ${extra}
 
-Rules:
-- All 4 options must be plausible (no obviously wrong distractors)
-- correct_option must be exactly one of: "a", "b", "c", "d"
-- explanation: 2–3 sentences explaining why the answer is correct
+CRITICAL RULES — follow these in order:
+1. Solve the problem yourself first. Compute the exact correct answer before writing any options.
+2. One of the four options (a, b, c, or d) MUST be that exact correct answer — not "close to" it, not "approximately" it. The exact value.
+3. The other three distractors must each correspond to a specific, named student mistake (e.g. forgetting to convert units, using the wrong formula, making a sign error). Do NOT invent random nearby numbers.
+4. correct_option must be exactly one of: "a", "b", "c", "d" and it must match the option that contains the exact correct answer.
+5. explanation: 2–3 sentences showing the step-by-step solution to the exact correct answer and why the common wrong answers are wrong.
+6. For numerical questions: all answer choices must be realistic values a student might compute; do not use placeholder "..." values.
 
-Return ONLY this JSON:
+Return ONLY this JSON (no extra text, no markdown):
 {
   "subject": "${subject}",
   "question": "...",
