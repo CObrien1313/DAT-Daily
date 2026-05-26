@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { format, startOfWeek } from 'date-fns'
+import { startOfWeek } from 'date-fns'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { calculateStreak } from '@/lib/utils'
@@ -10,6 +10,7 @@ import { TaskList } from '@/components/dashboard/task-list'
 import { SubjectProgressCard } from '@/components/dashboard/subject-progress-card'
 import { WeakTopicsCard } from '@/components/dashboard/weak-topics-card'
 import { LogSessionModal } from '@/components/dashboard/log-session-modal'
+import { DashboardGreeting } from '@/components/dashboard/dashboard-greeting'
 import type { StudyTask, SubjectProgress, WeakTopic } from '@/lib/types'
 
 export default async function DashboardPage() {
@@ -67,22 +68,11 @@ export default async function DashboardPage() {
     priority: wt.priority,
   }))
 
-  const hour = new Date().getHours()
-  const greeting =
-    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
-
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {greeting}, {profile?.name ?? 'there'} 👋
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {format(new Date(), 'EEEE, MMMM d')} — stay consistent, stay ahead.
-          </p>
-        </div>
+        <DashboardGreeting name={profile?.name ?? 'there'} />
         <LogSessionModal />
       </div>
 
