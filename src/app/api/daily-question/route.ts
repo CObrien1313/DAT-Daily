@@ -1,0 +1,134 @@
+import { NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { getQuestionDate } from '@/lib/question-date'
+
+export const maxDuration = 30
+
+const DAT_SUBJECTS = [
+  'Biology',
+  'General Chemistry',
+  'Organic Chemistry',
+  'Quantitative Reasoning',
+  'Perceptual Ability',
+  'Reading Comprehension',
+]
+
+interface GeneratedQuestion {
+  subject: string
+  question: string
+  option_a: string
+  option_b: string
+  option_c: string
+  option_d: string
+  correct_option: string
+  explanation: string
+}
+
+export async function GET() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const questionDate = getQuestionDate()
+
+  // Return existing question if already generated for today
+  const { data: existing } = await supabase
+    .from('daily_questions')
+    .select('*')
+    .eq('question_date', questionDate)
+    .single()
+
+  if (existing) return NextResponse.json(existing)
+
+  // Generate a new question with Claude
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
+  }
+
+  // Pick subject deterministically from the date so all users get the same subject
+  const dateNum = parseInt(questionDate.replace(/-/g, ''), 10)
+  const subject = DAT_SUBJECTS[dateNum % DAT_SUBJECTS.length]
+
+  const subjectInstructions: Record<string, string> = {
+    'Perceptual Ability': 'Create a text-based spatial reasoning question (e.g. cube counting, angle comparison, paper folding described in words).',
+    'Reading Comprehension': 'Provide a 3–4 sentence scientific passage, then ask one inference or detail question about it.',
+  }
+  const extra = subjectInstructions[subject] ?? ''
+
+  const client = new Anthropic()
+
+  const message = await client.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1024,
+    system: 'You are a DAT exam expert. Output ONLY raw JSON — no markdown fences, no explanation.',
+    messages: [{
+      role: 'user',
+      content: `Generate one challenging DAT practice question on the topic: ${subject}.
+${extra}
+
+Rules:
+- All 4 options must be plausible (no obviously wrong distractors)
+- correct_option must be exactly one of: "a", "b", "c", "d"
+- explanation: 2–3 sentences explaining why the answer is correct
+
+Return ONLY this JSON:
+{
+  "subject": "${subject}",
+  "question": "...",
+  "option_a": "...",
+  "option_b": "...",
+  "option_c": "...",
+  "option_d": "...",
+  "correct_option": "a",
+  "explanation": "..."
+}`,
+    }],
+  })
+
+  const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+
+  let parsed: GeneratedQuestion | null = null
+  for (const candidate of [
+    raw.trim(),
+    raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
+    (raw.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
+  ]) {
+    if (!candidate) continue
+    try { parsed = JSON.parse(candidate); break } catch { /* try next */ }
+  }
+
+  if (!parsed) {
+    return NextResponse.json({ error: 'Could not parse AI response' }, { status: 500 })
+  }
+
+  // Upsert so concurrent requests don't conflict
+  const { data: saved, error: saveErr } = await supabase
+    .from('daily_questions')
+    .upsert({
+      question_date: questionDate,
+      subject: parsed.subject,
+      question: parsed.question,
+      option_a: parsed.option_a,
+      option_b: parsed.option_b,
+      option_c: parsed.option_c,
+      option_d: parsed.option_d,
+      correct_option: parsed.correct_option,
+      explanation: parsed.explanation,
+    }, { onConflict: 'question_date' })
+    .select()
+    .single()
+
+  if (saveErr || !saved) {
+    // Another request beat us to it — fetch whatever is there
+    const { data: fallback } = await supabase
+      .from('daily_questions')
+      .select('*')
+      .eq('question_date', questionDate)
+      .single()
+    if (fallback) return NextResponse.json(fallback)
+    return NextResponse.json({ error: 'Failed to save question' }, { status: 500 })
+  }
+
+  return NextResponse.json(saved)
+}

@@ -11,6 +11,8 @@ import { SubjectProgressCard } from '@/components/dashboard/subject-progress-car
 import { WeakTopicsCard } from '@/components/dashboard/weak-topics-card'
 import { LogSessionModal } from '@/components/dashboard/log-session-modal'
 import { DashboardGreeting } from '@/components/dashboard/dashboard-greeting'
+import { DailyQuestionCard } from '@/components/dashboard/daily-question-card'
+import { getQuestionDate, calcQuestionStreak } from '@/lib/question-date'
 import type { StudyTask, SubjectProgress, WeakTopic } from '@/lib/types'
 
 export default async function DashboardPage() {
@@ -25,6 +27,7 @@ export default async function DashboardPage() {
 
   const _now = new Date()
   const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
+  const questionDate = getQuestionDate()
 
   // Fetch all dashboard data in parallel
   const [
@@ -33,16 +36,28 @@ export default async function DashboardPage() {
     { data: rawProgress },
     { data: rawWeakTopics },
     { data: rawSessions },
+    { data: dailyQuestion },
+    { data: userAnswer },
+    { data: allAnswers },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user.id).single(),
     supabase.from('study_tasks').select('*').eq('user_id', user.id).eq('date', today).order('created_at'),
     supabase.from('subject_progress').select('*').eq('user_id', user.id),
     supabase.from('weak_topics').select('*').eq('user_id', user.id).eq('resolved', false).order('created_at', { ascending: false }),
     supabase.from('study_sessions').select('date, duration_minutes').eq('user_id', user.id).order('date', { ascending: false }),
+    supabase.from('daily_questions').select('*').eq('question_date', questionDate).single(),
+    supabase.from('daily_question_answers').select('selected_option, is_correct').eq('user_id', user.id).eq('question_date', questionDate).single(),
+    supabase.from('daily_question_answers').select('question_date, is_correct').eq('user_id', user.id),
   ])
 
   // Streak
   const streakDays = calculateStreak((rawSessions ?? []).map((s) => s.date))
+
+  // Daily question stats
+  const answeredDates = (allAnswers ?? []).map((a) => a.question_date)
+  const questionStreak = calcQuestionStreak(answeredDates, questionDate)
+  const totalCorrect = (allAnswers ?? []).filter((a) => a.is_correct).length
+  const totalWrong = (allAnswers ?? []).filter((a) => !a.is_correct).length
 
   // Weekly hours (Mon–Sun)
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -149,6 +164,19 @@ export default async function DashboardPage() {
 
       {/* Weak topics */}
       <WeakTopicsCard initialTopics={weakTopics} />
+
+      {/* Daily DAT question */}
+      <div className="mt-4">
+        <DailyQuestionCard
+          questionDate={questionDate}
+          userId={user.id}
+          initialQuestion={dailyQuestion ?? null}
+          initialAnswer={userAnswer ?? null}
+          totalCorrect={totalCorrect}
+          totalWrong={totalWrong}
+          questionStreak={questionStreak}
+        />
+      </div>
     </div>
   )
 }
