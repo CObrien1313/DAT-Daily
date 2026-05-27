@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { DAT_SUBJECTS } from '@/lib/types'
 import type { DATSubject } from '@/lib/types'
+import { useXP } from '@/contexts/xp-context'
 
 const DURATION_PRESETS = [25, 45, 60, 90]
 
@@ -56,6 +57,7 @@ function StarRating({
 
 export function LogSessionModal() {
   const router = useRouter()
+  const { awardXP } = useXP()
   const [open, setOpen] = useState(false)
   const [subject, setSubject] = useState<DATSubject>('Biology')
   const [minutes, setMinutes] = useState(60)
@@ -146,6 +148,10 @@ export function LogSessionModal() {
 
     setSaving(false)
     setSaved(true)
+
+    // Award XP (fire-and-forget — after session is in DB)
+    awardXP({ type: 'LOG_SESSION', minutes: effectiveMinutes })
+
     router.refresh()
     if (!hit) setTimeout(() => handleClose(), 800)
   }

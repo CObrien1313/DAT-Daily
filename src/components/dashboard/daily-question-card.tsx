@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useXP } from '@/contexts/xp-context'
 
 const SUBJECT_BADGE_VARIANT: Record<string, 'default' | 'success' | 'info' | 'warning'> = {
   Biology: 'success',
@@ -54,6 +55,7 @@ export function DailyQuestionCard({
   initialQuestion,
   initialAnswer,
 }: DailyQuestionCardProps) {
+  const { awardXP } = useXP()
   const [question, setQuestion] = useState<DailyQuestion | null>(initialQuestion)
   const [fetchState, setFetchState] = useState<'idle' | 'loading' | 'error'>(
     initialQuestion ? 'idle' : 'loading'
@@ -94,6 +96,9 @@ export function DailyQuestionCard({
       selected_option: selected,
       is_correct: correct,
     })
+
+    // Award XP after answer is saved
+    awardXP({ type: correct ? 'DAILY_QUESTION_CORRECT' : 'DAILY_QUESTION_ANY' })
 
     setSaving(false)
     setSubmitted(true)

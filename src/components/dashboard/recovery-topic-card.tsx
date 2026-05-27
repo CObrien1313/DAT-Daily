@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { WeakTopic } from '@/lib/types'
+import { useXP } from '@/contexts/xp-context'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ interface Props {
 }
 
 export function RecoveryTopicCard({ topic, initialPlan }: Props) {
+  const { awardXP } = useXP()
   const [plan, setPlan] = useState<RecoveryPlan | null>(initialPlan)
   const [expanded, setExpanded] = useState(!!initialPlan)
   const [generating, setGenerating] = useState(false)
@@ -141,6 +143,10 @@ export function RecoveryTopicCard({ topic, initialPlan }: Props) {
       setSelectedForCurrent(null)
       setChecked(false)
     } else {
+      // Quiz finished — award XP based on score so far + the answer we just checked
+      const finalScore = results.filter((r) => r.isCorrect).length
+      const passed = finalScore >= 2  // 2/3 or 3/3
+      awardXP({ type: passed ? 'RECOVERY_QUIZ_PASS' : 'RECOVERY_QUIZ_COMPLETE' })
       setQuizMode('done')
     }
   }

@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { DAT_SUBJECTS } from '@/lib/types'
 import type { StudyTask, DATSubject } from '@/lib/types'
+import { useXP } from '@/contexts/xp-context'
 
 const SUBJECT_BADGE_VARIANT: Record<DATSubject, 'default' | 'success' | 'info' | 'warning'> = {
   Biology: 'success',
@@ -218,6 +219,7 @@ interface TaskListProps {
 
 export function TaskList({ initialTasks, date }: TaskListProps) {
   const router = useRouter()
+  const { awardXP } = useXP()
   const [tasks, setTasks] = useState(initialTasks)
   const _now = new Date()
   const today = `${_now.getFullYear()}-${String(_now.getMonth() + 1).padStart(2, '0')}-${String(_now.getDate()).padStart(2, '0')}`
@@ -235,9 +237,12 @@ export function TaskList({ initialTasks, date }: TaskListProps) {
   function handleToggle(id: string) {
     const task = tasks.find((t) => t.id === id)
     if (!task) return
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, completed: !t.completed } : t))
+    const completing = !task.completed
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, completed: completing } : t))
     const supabase = createClient()
-    supabase.from('study_tasks').update({ completed: !task.completed }).eq('id', id)
+    supabase.from('study_tasks').update({ completed: completing }).eq('id', id)
+    // Award XP only when completing (not unchecking)
+    if (completing) awardXP({ type: 'COMPLETE_TASK' })
   }
 
   function handleUpdate(id: string, changes: Partial<StudyTask>) {

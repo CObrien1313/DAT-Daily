@@ -11,6 +11,7 @@ import {
   TrendingUp,
   CircleHelp,
   Zap,
+  Trophy,
   Settings,
   BookOpen,
   Menu,
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/insights', label: 'Insights', icon: TrendingUp },
   { href: '/questions', label: 'Daily Question', icon: CircleHelp },
   { href: '/recovery', label: 'Recovery', icon: Zap },
+  { href: '/achievements', label: 'Achievements', icon: Trophy },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

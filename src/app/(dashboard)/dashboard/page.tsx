@@ -12,6 +12,7 @@ import { WeakTopicsCard } from '@/components/dashboard/weak-topics-card'
 import { LogSessionModal } from '@/components/dashboard/log-session-modal'
 import { DashboardGreeting } from '@/components/dashboard/dashboard-greeting'
 import { DailyQuestionStreakCard } from '@/components/dashboard/daily-question-streak-card'
+import { LevelCard } from '@/components/dashboard/level-card'
 import { getQuestionDate, calcQuestionStreak } from '@/lib/question-date'
 import type { StudyTask, SubjectProgress, WeakTopic } from '@/lib/types'
 
@@ -139,7 +140,7 @@ export default async function DashboardPage() {
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <StreakCard streakDays={streakDays} longestStreak={streakDays} />
         <CountdownCard examDate={profile?.exam_date ?? null} />
         <WeeklyHoursCard
@@ -151,6 +152,7 @@ export default async function DashboardPage() {
           totalCorrect={totalCorrect}
           totalWrong={totalWrong}
         />
+        <LevelCard xp={profile?.xp ?? 0} />
       </div>
 
       {/* Tasks + Subject progress */}
