@@ -29,6 +29,47 @@ interface GeneratedPlan {
   tips: string[]
 }
 
+/**
+ * Robustly extracts the first valid JSON object from a string.
+ * Handles leading/trailing text, markdown fences, and braces inside strings.
+ */
+function extractJSON<T>(text: string): T | null {
+  // 1. Direct parse after trimming
+  for (const s of [
+    text.trim(),
+    text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim(),
+  ]) {
+    try { return JSON.parse(s) as T } catch { /* continue */ }
+  }
+
+  // 2. Brace-depth scan — correctly skips braces inside string literals
+  let start = -1
+  let depth = 0
+  let inString = false
+  let escape = false
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (escape) { escape = false; continue }
+    if (c === '\\' && inString) { escape = true; continue }
+    if (c === '"') { inString = !inString; continue }
+    if (inString) continue
+
+    if (c === '{') {
+      if (depth === 0) start = i
+      depth++
+    } else if (c === '}') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        try { return JSON.parse(text.slice(start, i + 1)) as T } catch {
+          start = -1  // this block wasn't valid JSON — keep scanning
+        }
+      }
+    }
+  }
+  return null
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -93,18 +134,15 @@ Requirements: exactly 3 practice questions, exactly 5 key points, 2–3 study se
 
     const raw = message.content[0].type === 'text' ? message.content[0].text : ''
 
-    let parsed: GeneratedPlan | null = null
-    for (const candidate of [
-      raw.trim(),
-      raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
-      (raw.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
-    ]) {
-      if (!candidate) continue
-      try { parsed = JSON.parse(candidate); break } catch { /* try next */ }
-    }
+    const parsed = extractJSON<GeneratedPlan>(raw)
 
     if (!parsed) {
-      return NextResponse.json({ error: 'Could not parse AI response' }, { status: 500 })
+      // Include first 300 chars of raw response to help diagnose
+      const preview = raw.slice(0, 300).replace(/\n/g, ' ')
+      return NextResponse.json(
+        { error: `Could not parse AI response. Raw (first 300 chars): ${preview}` },
+        { status: 500 }
+      )
     }
 
     // Replace existing plan for this topic

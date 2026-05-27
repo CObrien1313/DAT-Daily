@@ -25,6 +25,31 @@ interface GeneratedQuestion {
   explanation: string
 }
 
+function extractJSON<T>(text: string): T | null {
+  for (const s of [
+    text.trim(),
+    text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim(),
+  ]) {
+    try { return JSON.parse(s) as T } catch { /* continue */ }
+  }
+  let start = -1, depth = 0, inString = false, escape = false
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (escape) { escape = false; continue }
+    if (c === '\\' && inString) { escape = true; continue }
+    if (c === '"') { inString = !inString; continue }
+    if (inString) continue
+    if (c === '{') { if (depth === 0) start = i; depth++ }
+    else if (c === '}') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        try { return JSON.parse(text.slice(start, i + 1)) as T } catch { start = -1 }
+      }
+    }
+  }
+  return null
+}
+
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -98,16 +123,7 @@ Return ONLY this JSON (no extra text, no markdown):
   })
 
   const raw = message.content[0].type === 'text' ? message.content[0].text : ''
-
-  let parsed: GeneratedQuestion | null = null
-  for (const candidate of [
-    raw.trim(),
-    raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
-    (raw.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
-  ]) {
-    if (!candidate) continue
-    try { parsed = JSON.parse(candidate); break } catch { /* try next */ }
-  }
+  const parsed = extractJSON<GeneratedQuestion>(raw)
 
   if (!parsed) {
     return NextResponse.json({ error: 'Could not parse AI response' }, { status: 500 })
