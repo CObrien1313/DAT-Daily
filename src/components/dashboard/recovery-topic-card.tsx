@@ -100,13 +100,20 @@ export function RecoveryTopicCard({ topic, initialPlan }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topicId: topic.id, topic: topic.topic, subject: topic.subject }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        let msg = `Request failed (${res.status})`
+        try {
+          const body = await res.json()
+          if (body?.error) msg = body.error
+        } catch { /* ignore parse error */ }
+        throw new Error(msg)
+      }
       const data: RecoveryPlan = await res.json()
       setPlan(data)
       setExpanded(true)
       resetQuiz()
-    } catch {
-      setGenError('Generation failed — please try again.')
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : 'Generation failed — please try again.')
     } finally {
       setGenerating(false)
     }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 interface PracticeQuestion {
   question: string
@@ -107,7 +107,8 @@ Requirements: exactly 3 practice questions, exactly 5 key points, 2–3 study se
 
   // Replace existing plan for this topic
   if (topicId) {
-    await supabase.from('recovery_plans').delete().eq('user_id', user.id).eq('topic_id', topicId)
+    const { error: delErr } = await supabase.from('recovery_plans').delete().eq('user_id', user.id).eq('topic_id', topicId)
+    if (delErr) console.error('[recovery-plan] Delete error (non-fatal):', delErr)
   }
 
   const { data: saved, error: saveErr } = await supabase
@@ -127,7 +128,11 @@ Requirements: exactly 3 practice questions, exactly 5 key points, 2–3 study se
     .single()
 
   if (saveErr || !saved) {
-    return NextResponse.json({ error: 'Failed to save plan' }, { status: 500 })
+    console.error('[recovery-plan] Supabase insert error:', saveErr)
+    return NextResponse.json(
+      { error: `Failed to save plan: ${saveErr?.message ?? 'unknown error'}` },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json(saved)
