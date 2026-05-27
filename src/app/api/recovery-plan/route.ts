@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
 
-export const maxDuration = 60
+// Edge runtime: no 10-second serverless limit — supports up to 30s on Hobby plan
+export const runtime = 'edge'
 
 interface PracticeQuestion {
   question: string
@@ -29,30 +30,31 @@ interface GeneratedPlan {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json() as { topicId: string; topic: string; subject: string }
-  const { topicId, topic, subject } = body
+    const body = await request.json() as { topicId: string; topic: string; subject: string }
+    const { topicId, topic, subject } = body
 
-  if (!topic || !subject) {
-    return NextResponse.json({ error: 'Missing topic or subject' }, { status: 400 })
-  }
+    if (!topic || !subject) {
+      return NextResponse.json({ error: 'Missing topic or subject' }, { status: 400 })
+    }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
-  }
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json({ error: 'AI not configured — check ANTHROPIC_API_KEY in Vercel env vars' }, { status: 503 })
+    }
 
-  const client = new Anthropic()
+    const client = new Anthropic()
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
-    system: 'You are a DAT exam expert and study coach. Output ONLY raw JSON — no markdown fences, no explanation.',
-    messages: [{
-      role: 'user',
-      content: `A student is struggling with "${topic}" in ${subject} for the DAT exam. Generate a focused recovery plan.
+    const message = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      system: 'You are a DAT exam expert and study coach. Output ONLY raw JSON — no markdown fences, no explanation.',
+      messages: [{
+        role: 'user',
+        content: `A student is struggling with "${topic}" in ${subject} for the DAT exam. Generate a focused recovery plan.
 
 PRACTICE QUESTION RULES (CRITICAL):
 1. Solve each problem yourself first to get the EXACT correct answer
@@ -86,54 +88,58 @@ Return ONLY this JSON:
 }
 
 Requirements: exactly 3 practice questions, exactly 5 key points, 2–3 study sessions, 3–4 tips.`,
-    }],
-  })
-
-  const raw = message.content[0].type === 'text' ? message.content[0].text : ''
-
-  let parsed: GeneratedPlan | null = null
-  for (const candidate of [
-    raw.trim(),
-    raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
-    (raw.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
-  ]) {
-    if (!candidate) continue
-    try { parsed = JSON.parse(candidate); break } catch { /* try next */ }
-  }
-
-  if (!parsed) {
-    return NextResponse.json({ error: 'Could not parse AI response' }, { status: 500 })
-  }
-
-  // Replace existing plan for this topic
-  if (topicId) {
-    const { error: delErr } = await supabase.from('recovery_plans').delete().eq('user_id', user.id).eq('topic_id', topicId)
-    if (delErr) console.error('[recovery-plan] Delete error (non-fatal):', delErr)
-  }
-
-  const { data: saved, error: saveErr } = await supabase
-    .from('recovery_plans')
-    .insert({
-      user_id: user.id,
-      topic_id: topicId ?? null,
-      topic,
-      subject,
-      overview: parsed.overview,
-      key_points: parsed.key_points,
-      practice_questions: parsed.practice_questions,
-      study_sessions: parsed.study_sessions,
-      tips: parsed.tips,
+      }],
     })
-    .select()
-    .single()
 
-  if (saveErr || !saved) {
-    console.error('[recovery-plan] Supabase insert error:', saveErr)
-    return NextResponse.json(
-      { error: `Failed to save plan: ${saveErr?.message ?? 'unknown error'}` },
-      { status: 500 }
-    )
+    const raw = message.content[0].type === 'text' ? message.content[0].text : ''
+
+    let parsed: GeneratedPlan | null = null
+    for (const candidate of [
+      raw.trim(),
+      raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim(),
+      (raw.match(/\{[\s\S]*\}/) ?? [])[0] ?? '',
+    ]) {
+      if (!candidate) continue
+      try { parsed = JSON.parse(candidate); break } catch { /* try next */ }
+    }
+
+    if (!parsed) {
+      return NextResponse.json({ error: 'Could not parse AI response' }, { status: 500 })
+    }
+
+    // Replace existing plan for this topic
+    if (topicId) {
+      await supabase.from('recovery_plans').delete().eq('user_id', user.id).eq('topic_id', topicId)
+    }
+
+    const { data: saved, error: saveErr } = await supabase
+      .from('recovery_plans')
+      .insert({
+        user_id: user.id,
+        topic_id: topicId ?? null,
+        topic,
+        subject,
+        overview: parsed.overview,
+        key_points: parsed.key_points,
+        practice_questions: parsed.practice_questions,
+        study_sessions: parsed.study_sessions,
+        tips: parsed.tips,
+      })
+      .select()
+      .single()
+
+    if (saveErr || !saved) {
+      return NextResponse.json(
+        { error: `DB error: ${saveErr?.message ?? 'insert returned no data'}` },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json(saved)
+
+  } catch (err) {
+    // Top-level catch — always return JSON so the client can display the real message
+    const message = err instanceof Error ? err.message : String(err)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  return NextResponse.json(saved)
 }
