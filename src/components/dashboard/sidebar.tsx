@@ -10,6 +10,7 @@ import {
   BarChart3,
   TrendingUp,
   CircleHelp,
+  Zap,
   Settings,
   BookOpen,
   Menu,
@@ -26,6 +27,7 @@ const navItems = [
   { href: '/progress', label: 'Progress', icon: BarChart3 },
   { href: '/insights', label: 'Insights', icon: TrendingUp },
   { href: '/questions', label: 'Daily Question', icon: CircleHelp },
+  { href: '/recovery', label: 'Recovery', icon: Zap },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
