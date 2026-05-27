@@ -12,6 +12,7 @@ import {
   CircleHelp,
   Zap,
   Trophy,
+  Library,
   Settings,
   BookOpen,
   Menu,
@@ -30,6 +31,7 @@ const navItems = [
   { href: '/questions', label: 'Daily Question', icon: CircleHelp },
   { href: '/recovery', label: 'Recovery', icon: Zap },
   { href: '/achievements', label: 'Achievements', icon: Trophy },
+  { href: '/resources', label: 'Resources', icon: Library },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
