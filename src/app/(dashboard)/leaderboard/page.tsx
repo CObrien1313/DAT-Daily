@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Category = 'hours' | 'streak' | 'questions' | 'accuracy'
+type Category = 'streak' | 'questions' | 'accuracy'
 type Scope = 'global' | 'friends'
 
 interface LeaderboardRow {
@@ -25,7 +25,6 @@ interface LeaderboardRow {
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const CATEGORIES: { id: Category; label: string; unit: string; emoji: string }[] = [
-  { id: 'hours',     label: 'Study Hours',  unit: 'hrs',   emoji: '⏱️' },
   { id: 'streak',    label: 'Streak',       unit: 'days',  emoji: '🔥' },
   { id: 'questions', label: 'Questions',    unit: 'ans',   emoji: '❓' },
   { id: 'accuracy',  label: 'Accuracy',     unit: '%',     emoji: '🎯' },
@@ -54,7 +53,7 @@ function RankBadge({ rank }: { rank: number }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function LeaderboardPage() {
-  const [category, setCategory] = useState<Category>('hours')
+  const [category, setCategory] = useState<Category>('streak')
   const [scope, setScope] = useState<Scope>('global')
   const [rows, setRows] = useState<LeaderboardRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,7 +82,6 @@ export default function LeaderboardPage() {
   const activeCat = CATEGORIES.find((c) => c.id === category)!
 
   function formatValue(val: number): string {
-    if (category === 'hours') return val.toFixed(1)
     if (category === 'accuracy') return val.toFixed(1)
     return String(Math.round(val))
   }
