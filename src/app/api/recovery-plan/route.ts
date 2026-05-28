@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { needsWeekReset } from '@/lib/subscription'
 
 export const maxDuration = 60
 
@@ -84,6 +85,24 @@ export async function POST(request: Request) {
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json({ error: 'AI not configured — check ANTHROPIC_API_KEY in Vercel env vars' }, { status: 503 })
+    }
+
+    // ── Usage limit check ──────────────────────────────────────────────────
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, recovery_plans_this_week, recovery_week_start')
+      .eq('id', user.id)
+      .single()
+
+    const isPro     = (profile?.plan ?? 'free') === 'pro'
+    const recReset  = needsWeekReset(profile?.recovery_week_start)
+    const recUsed   = recReset ? 0 : (profile?.recovery_plans_this_week ?? 0)
+
+    if (!isPro && recUsed >= 1) {
+      return NextResponse.json({
+        error:   'limit_reached',
+        message: 'Upgrade to Pro for unlimited recovery plan generations.',
+      }, { status: 403 })
     }
 
     const client = new Anthropic()
@@ -170,6 +189,14 @@ Requirements: exactly 3 practice questions, exactly 5 key points, 2–3 study se
         { error: `DB error: ${saveErr?.message ?? 'insert returned no data'}` },
         { status: 500 }
       )
+    }
+
+    // Increment weekly usage counter
+    if (!isPro) {
+      await supabase.from('profiles').update({
+        recovery_plans_this_week: recReset ? 1 : recUsed + 1,
+        recovery_week_start: recReset ? new Date().toISOString() : profile?.recovery_week_start,
+      }).eq('id', user.id)
     }
 
     return NextResponse.json(saved)

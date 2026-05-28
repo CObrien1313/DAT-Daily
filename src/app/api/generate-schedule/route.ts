@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/lib/supabase/server'
+import { needsWeekReset } from '@/lib/subscription'
 
 export const maxDuration = 60
 
@@ -64,6 +66,32 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // ── Auth + usage limit check ───────────────────────────────────────────────
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('plan, schedules_this_week, schedule_week_start')
+    .eq('id', user.id)
+    .single()
+
+  const isPro = (profile?.plan ?? 'free') === 'pro'
+  const schedReset = needsWeekReset(profile?.schedule_week_start)
+  const schedUsed  = schedReset ? 0 : (profile?.schedules_this_week ?? 0)
+
+  if (!isPro && schedUsed >= 1) {
+    return new Response(JSON.stringify({
+      error:   'limit_reached',
+      message: 'Upgrade to Pro for unlimited AI schedule recreations.',
+    }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+  }
+
   const body: GenerateScheduleBody = await request.json()
   const { examDate, weeklyHours, weakSubjects, subjectProgress, recentSessions, notes } = body
 
@@ -116,6 +144,13 @@ Return this JSON shape and nothing else:
           if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
             controller.enqueue(encoder.encode(chunk.delta.text))
           }
+        }
+        // Increment weekly usage counter after successful stream
+        if (!isPro) {
+          await supabase.from('profiles').update({
+            schedules_this_week: schedReset ? 1 : schedUsed + 1,
+            schedule_week_start: schedReset ? new Date().toISOString() : profile?.schedule_week_start,
+          }).eq('id', user.id)
         }
         controller.close()
       } catch (err) {

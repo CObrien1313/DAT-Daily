@@ -6,6 +6,7 @@ import { Loader2, Sparkles, Clock, BookOpen, Lightbulb, ChevronDown, ChevronUp, 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { UpgradeModal } from '@/components/ui/upgrade-modal'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { DAT_SUBJECTS, SUBJECT_COLORS } from '@/lib/types'
@@ -132,6 +133,7 @@ export function ScheduleGenerator({
   const [schedule, setSchedule] = useState<GeneratedSchedule | null>(existingSchedule)
   const [savedAt, setSavedAt] = useState<string | null>(generatedAt)
   const [error, setError] = useState<string | null>(null)
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null)
 
   const daysUntilExam = examDate
     ? Math.max(0, Math.ceil((new Date(examDate + 'T12:00:00').getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -154,7 +156,21 @@ export function ScheduleGenerator({
         body: JSON.stringify({ examDate, weeklyHours, weakSubjects, subjectProgress, recentSessions, notes: notes.trim() || undefined }),
       })
 
-      if (!res.ok || !res.body) {
+      if (!res.ok) {
+        try {
+          const body = await res.json()
+          if (body.error === 'limit_reached') {
+            setUpgradeMsg(body.message as string)
+          } else {
+            setError(body.error ?? 'Failed to generate schedule.')
+          }
+        } catch {
+          setError('Failed to reach the AI. Please try again.')
+        }
+        setLoading(false)
+        return
+      }
+      if (!res.body) {
         setError('Failed to reach the AI. Please try again.')
         setLoading(false)
         return
@@ -218,6 +234,9 @@ export function ScheduleGenerator({
 
   return (
     <div className="space-y-6">
+      {upgradeMsg && (
+        <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />
+      )}
       {/* Config / regen card */}
       <Card>
         <CardHeader>

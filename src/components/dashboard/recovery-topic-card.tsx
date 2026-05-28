@@ -6,6 +6,7 @@ import {
   CheckCircle2, XCircle, RotateCcw, Trophy,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { UpgradeModal } from '@/components/ui/upgrade-modal'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import type { WeakTopic } from '@/lib/types'
@@ -80,6 +81,7 @@ export function RecoveryTopicCard({ topic, initialPlan }: Props) {
   const [expanded, setExpanded] = useState(!!initialPlan)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState<string | null>(null)
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null)
   const [resolved, setResolved] = useState(false)
 
   // Quiz state
@@ -103,12 +105,18 @@ export function RecoveryTopicCard({ topic, initialPlan }: Props) {
         body: JSON.stringify({ topicId: topic.id, topic: topic.topic, subject: topic.subject }),
       })
       if (!res.ok) {
-        let msg = `Request failed (${res.status})`
         try {
           const body = await res.json()
-          if (body?.error) msg = body.error
-        } catch { /* ignore parse error */ }
-        throw new Error(msg)
+          if (body?.error === 'limit_reached') {
+            setUpgradeMsg(body.message as string)
+            setGenerating(false)
+            return
+          }
+          throw new Error(body?.error ?? `Request failed (${res.status})`)
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== `Request failed (${res.status})`) throw parseErr
+          throw new Error(`Request failed (${res.status})`)
+        }
       }
       const data: RecoveryPlan = await res.json()
       setPlan(data)
@@ -160,6 +168,23 @@ export function RecoveryTopicCard({ topic, initialPlan }: Props) {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (resolved) return null
+
+  if (upgradeMsg) {
+    return (
+      <>
+        <div className={cn('rounded-xl border border-slate-200 bg-white overflow-hidden border-l-4 shadow-sm', ps.border)}>
+          <div className="flex items-center gap-3 p-4">
+            <div className={cn('w-2.5 h-2.5 rounded-full flex-shrink-0', ps.dot)} />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 truncate">{topic.topic}</p>
+              <p className="text-xs text-slate-400">{topic.subject}</p>
+            </div>
+          </div>
+        </div>
+        <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />
+      </>
+    )
+  }
 
   const questions = plan?.practice_questions ?? []
   const currentQ = questions[currentQIdx]
