@@ -19,13 +19,13 @@ export function PlanBadge() {
 
   if (plan === 'pro') {
     return (
-      <div className="mx-2 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30">
+      <Link href="/upgrade" className="mx-2 mb-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:from-amber-500/30 hover:to-orange-500/30 transition-colors">
         <span className="text-sm">✨</span>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold text-amber-400 leading-none">PRO</p>
           <p className="text-[10px] text-amber-500/70 mt-0.5">All features unlocked</p>
         </div>
-      </div>
+      </Link>
     )
   }
 
