@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { PlanBadge } from '@/components/dashboard/plan-badge'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -106,8 +107,11 @@ export function Sidebar() {
           <span className="font-bold text-white text-lg tracking-tight">DAT Daily</span>
         </div>
         <NavLinks />
-        <div className="p-2 border-t border-slate-800">
-          <SignOutButton />
+        <div className="pb-2 border-t border-slate-800 pt-2">
+          <PlanBadge />
+          <div className="px-2">
+            <SignOutButton />
+          </div>
         </div>
       </aside>
 
