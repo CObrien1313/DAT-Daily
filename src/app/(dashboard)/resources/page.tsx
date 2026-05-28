@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Library, FlaskConical, Layers, Eye } from 'lucide-react'
+import { Library, FlaskConical, Layers, Eye, BookOpen, Atom } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +27,16 @@ const RESOURCES = [
     iconBg: 'bg-violet-50 text-violet-600',
   },
   {
+    href: '/resources/ochem',
+    icon: Atom,
+    emoji: '🧪',
+    title: 'OChem Reaction Bank',
+    description: 'Searchable bank of DAT reactions — reagents, products, mechanisms, and key notes organized by reaction type.',
+    tags: ['Substitution', 'Elimination', 'Addition', 'Carbonyl', 'EAS', 'Amines'],
+    color: 'border-violet-200 hover:border-violet-400',
+    iconBg: 'bg-violet-50 text-violet-600',
+  },
+  {
     href: '/resources/pat',
     icon: Eye,
     emoji: '🔷',
@@ -35,6 +45,16 @@ const RESOURCES = [
     tags: ['Keyholes', 'Top-Front-End', 'Hole Punching', 'Cube Counting'],
     color: 'border-orange-200 hover:border-orange-400',
     iconBg: 'bg-orange-50 text-orange-600',
+  },
+  {
+    href: '/resources/rc',
+    icon: BookOpen,
+    emoji: '📖',
+    title: 'RC Strategy Guide',
+    description: 'Reading Comprehension approach, all question types, time management, and how to avoid the most common traps.',
+    tags: ['Main Idea', 'Detail', 'Inference', 'Tone', 'EXCEPT questions', 'Time management'],
+    color: 'border-cyan-200 hover:border-cyan-400',
+    iconBg: 'bg-cyan-50 text-cyan-600',
   },
 ]
 
@@ -51,7 +71,7 @@ export default async function ResourcesPage() {
           <h1 className="text-2xl font-bold text-slate-900">DAT Resources</h1>
         </div>
         <p className="text-sm text-slate-500">
-          Formula sheets, flashcards, and strategy guides to supplement your study sessions.
+          Formula sheets, flashcards, reaction banks, and strategy guides — all the reference material you need in one place.
         </p>
       </div>
 
