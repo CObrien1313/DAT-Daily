@@ -15,6 +15,7 @@ import {
   Library,
   Users,
   Medal,
+  Sword,
   Settings,
   BookOpen,
   Menu,
@@ -35,6 +36,7 @@ const navItems = [
   { href: '/achievements', label: 'Achievements', icon: Trophy },
   { href: '/resources', label: 'Resources', icon: Library },
   { href: '/social', label: 'Friends', icon: Users },
+  { href: '/battles', label: 'Battles', icon: Sword },
   { href: '/leaderboard', label: 'Leaderboard', icon: Medal },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
