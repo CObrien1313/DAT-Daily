@@ -4,20 +4,8 @@ export const BATTLE_TYPES = [
   {
     id: 'combined' as const,
     label: 'Combined Score',
-    description: 'Questions × 2 + Accuracy × 1.5 + Minutes ÷ 10',
+    description: 'Study minutes + daily question bonus',
     emoji: '⚔️',
-  },
-  {
-    id: 'questions' as const,
-    label: 'Questions Answered',
-    description: 'Most daily questions completed',
-    emoji: '❓',
-  },
-  {
-    id: 'accuracy' as const,
-    label: 'Accuracy',
-    description: 'Highest % correct (min 3 questions)',
-    emoji: '🎯',
   },
   {
     id: 'study_time' as const,
@@ -33,7 +21,7 @@ export const BATTLE_TYPES = [
   },
 ]
 
-export type BattleType = 'combined' | 'questions' | 'accuracy' | 'study_time' | 'streak'
+export type BattleType = 'combined' | 'study_time' | 'streak'
 
 // ── Subjects (only used for study_time / combined) ────────────────────────────
 
@@ -120,13 +108,19 @@ export function formatTimeRemaining(endsAt: string): string {
 }
 
 export function formatScore(score: number, type: BattleType): string {
-  if (type === 'accuracy')   return `${Number(score).toFixed(1)}%`
   if (type === 'study_time') return `${Math.round(score)}m`
   if (type === 'combined')   return Number(score).toFixed(1)
   return String(Math.round(score))
 }
 
-/** Whether this battle type uses a subject filter */
+/** Whether this battle type uses a subject filter (study_time and combined filter by subject) */
 export function hasSubjectFilter(type: BattleType): boolean {
   return type === 'study_time' || type === 'combined'
 }
+
+// ── Future: Premium real-time quiz battle ─────────────────────────────────────
+// Plan: Add a "Quiz Duel" battle type where both players answer the same DAT-style
+// questions simultaneously (like Trivia Crack). First to answer correctly wins the
+// question. Best of N questions wins the battle. This will require a subscription
+// and a dedicated real-time question bank. Do NOT build until premium/paywall
+// infrastructure is in place.

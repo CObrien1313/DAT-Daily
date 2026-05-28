@@ -270,20 +270,12 @@ export default function BattlePage({ params }: Props) {
             {opponent.name}
           </p>
 
-          {(battle_type === 'combined' || battle_type === 'questions' || battle_type === 'accuracy') && (
+          {battle_type === 'combined' && (
             <ScoreBar
-              label="Questions"
+              label="Daily Q bonus"
               a={challengerScore?.questions ?? 0}
               b={opponentScore?.questions ?? 0}
               maxVal={maxQ}
-            />
-          )}
-          {(battle_type === 'combined' || battle_type === 'accuracy') && (
-            <ScoreBar
-              label="Accuracy %"
-              a={challengerScore ? (challengerScore.questions > 0 ? Math.round(100 * challengerScore.correct / challengerScore.questions) : 0) : 0}
-              b={opponentScore   ? (opponentScore.questions   > 0 ? Math.round(100 * opponentScore.correct   / opponentScore.questions)   : 0) : 0}
-              maxVal={100}
             />
           )}
           {(battle_type === 'combined' || battle_type === 'study_time') && (
