@@ -21,6 +21,7 @@ import {
   Menu,
   X,
   LogOut,
+  MessageSquare,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -39,6 +40,7 @@ const navItems = [
   { href: '/battles', label: 'Battles', icon: Sword },
   { href: '/leaderboard', label: 'Leaderboard', icon: Medal },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/feedback', label: 'Feedback', icon: MessageSquare },
 ]
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
