@@ -88,9 +88,14 @@ export async function POST(request: Request) {
 
     // ── Persist ───────────────────────────────────────────────────────────────
 
+    const profileUpdate: Record<string, unknown> = { xp: newXP, level: newLevel.level }
+    if (action.type === 'LOG_SESSION') {
+      profileUpdate.current_streak = currentStreak
+    }
+
     await supabase
       .from('profiles')
-      .update({ xp: newXP, level: newLevel.level })
+      .update(profileUpdate)
       .eq('id', user.id)
 
     if (brandNew.length > 0) {

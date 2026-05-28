@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 interface SettingsFormProps {
   profile: {
     name: string
+    username: string | null
+    school: string | null
     exam_date: string | null
     weekly_hours_goal: number
   }
@@ -18,11 +20,28 @@ interface SettingsFormProps {
 export function SettingsForm({ profile }: SettingsFormProps) {
   const router = useRouter()
   const [name, setName] = useState(profile.name ?? '')
+  const [username, setUsername] = useState(profile.username ?? '')
+  const [school, setSchool] = useState(profile.school ?? '')
   const [examDate, setExamDate] = useState(profile.exam_date ?? '')
   const [weeklyHours, setWeeklyHours] = useState(profile.weekly_hours_goal ?? 30)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [usernameError, setUsernameError] = useState<string | null>(null)
+
+  function validateUsername(val: string): string | null {
+    if (!val) return null // optional
+    if (val.length < 3) return 'Username must be at least 3 characters'
+    if (val.length > 24) return 'Username must be 24 characters or fewer'
+    if (!/^[a-z0-9_]+$/.test(val)) return 'Only lowercase letters, numbers, and underscores'
+    return null
+  }
+
+  function handleUsernameChange(val: string) {
+    const lower = val.toLowerCase().replace(/[^a-z0-9_]/g, '')
+    setUsername(lower)
+    setUsernameError(validateUsername(lower))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -30,21 +49,41 @@ export function SettingsForm({ profile }: SettingsFormProps) {
     setSaved(false)
     setError(null)
 
+    const uError = validateUsername(username)
+    if (uError) { setUsernameError(uError); setLoading(false); return }
+
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not authenticated'); setLoading(false); return }
 
-    const { error } = await supabase
+    // Check username uniqueness if it changed
+    if (username && username !== profile.username) {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .neq('id', user.id)
+        .maybeSingle()
+      if (existing) {
+        setUsernameError('That username is already taken')
+        setLoading(false)
+        return
+      }
+    }
+
+    const { error: saveError } = await supabase
       .from('profiles')
       .update({
         name: name.trim(),
+        username: username.trim() || null,
+        school: school.trim() || null,
         exam_date: examDate || null,
         weekly_hours_goal: weeklyHours,
       })
       .eq('id', user.id)
 
-    if (error) {
-      setError(error.message)
+    if (saveError) {
+      setError(saveError.message)
     } else {
       setSaved(true)
       router.refresh()
@@ -74,6 +113,47 @@ export function SettingsForm({ profile }: SettingsFormProps) {
               placeholder="Your name"
               className={inputClass}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Username
+            </label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-slate-400 select-none">@</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                placeholder="yourhandle"
+                maxLength={24}
+                className={`${inputClass} pl-8 ${usernameError ? 'border-red-400 focus:ring-red-400' : ''}`}
+              />
+            </div>
+            {usernameError ? (
+              <p className="text-xs text-red-500 mt-1">{usernameError}</p>
+            ) : (
+              <p className="text-xs text-slate-400 mt-1.5">
+                Lowercase letters, numbers, underscores. Required to appear on leaderboards and in search.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              School <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={school}
+              onChange={(e) => setSchool(e.target.value)}
+              placeholder="e.g. University of Florida"
+              maxLength={80}
+              className={inputClass}
+            />
+            <p className="text-xs text-slate-400 mt-1.5">
+              Shows on your public profile and enables school leaderboards.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -128,7 +208,7 @@ export function SettingsForm({ profile }: SettingsFormProps) {
       )}
 
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading || !!usernameError}>
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           {loading ? 'Saving…' : 'Save changes'}
         </Button>

@@ -13,6 +13,8 @@ import {
   Zap,
   Trophy,
   Library,
+  Users,
+  Medal,
   Settings,
   BookOpen,
   Menu,
@@ -32,6 +34,8 @@ const navItems = [
   { href: '/recovery', label: 'Recovery', icon: Zap },
   { href: '/achievements', label: 'Achievements', icon: Trophy },
   { href: '/resources', label: 'Resources', icon: Library },
+  { href: '/social', label: 'Friends', icon: Users },
+  { href: '/leaderboard', label: 'Leaderboard', icon: Medal },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 

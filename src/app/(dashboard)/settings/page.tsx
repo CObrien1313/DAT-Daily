@@ -9,7 +9,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, exam_date, weekly_hours_goal')
+    .select('name, username, school, exam_date, weekly_hours_goal')
     .eq('id', user.id)
     .single()
 
@@ -24,6 +24,8 @@ export default async function SettingsPage() {
       <SettingsForm
         profile={{
           name: profile?.name ?? '',
+          username: profile?.username ?? null,
+          school: profile?.school ?? null,
           exam_date: profile?.exam_date ?? null,
           weekly_hours_goal: profile?.weekly_hours_goal ?? 30,
         }}
