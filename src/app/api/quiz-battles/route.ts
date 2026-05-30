@@ -152,9 +152,10 @@ ${subjectLine}
 
 CRITICAL RULES:
 1. Solve each problem yourself first to get the EXACT correct answer.
-2. correct_option must be exactly "a", "b", "c", or "d" matching the option with the exact correct answer.
-3. The other 3 options must be plausible distractors corresponding to specific student mistakes.
-4. Do NOT include explanations — this is for a live quiz battle.
+2. correct_option must be exactly "a", "b", "c", or "d" — whichever option holds the correct answer.
+3. IMPORTANT: Spread correct_option values evenly. Do NOT default to "a". Across the full set, roughly 25% should be "a", 25% "b", 25% "c", 25% "d". Vary them deliberately.
+4. The other 3 options must be plausible distractors corresponding to specific student mistakes.
+5. Do NOT include explanations — this is for a live quiz battle.
 
 Return ONLY this JSON array (no extra text):
 [
@@ -165,7 +166,16 @@ Return ONLY this JSON array (no extra text):
     "option_b": "...",
     "option_c": "...",
     "option_d": "...",
-    "correct_option": "a"
+    "correct_option": "b"
+  },
+  {
+    "subject": "General Chemistry",
+    "question": "Full question text",
+    "option_a": "...",
+    "option_b": "...",
+    "option_c": "...",
+    "option_d": "...",
+    "correct_option": "d"
   }
 ]
 
@@ -180,9 +190,34 @@ Generate exactly ${qCount} questions now.`,
     return NextResponse.json({ error: 'Could not generate questions — please try again.' }, { status: 500 })
   }
 
+  // Shuffle options for each question to guarantee answer variety
+  const shuffled = parsed.map((q) => {
+    const opts: Array<{ key: 'a' | 'b' | 'c' | 'd'; text: string }> = [
+      { key: 'a', text: q.option_a },
+      { key: 'b', text: q.option_b },
+      { key: 'c', text: q.option_c },
+      { key: 'd', text: q.option_d },
+    ]
+    // Fisher-Yates shuffle
+    for (let i = opts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[opts[i], opts[j]] = [opts[j], opts[i]]
+    }
+    const correctText = q[`option_${q.correct_option}` as keyof RawQuestion] as string
+    const newCorrect  = opts.find((o) => o.text === correctText)?.key ?? q.correct_option
+    return {
+      ...q,
+      option_a: opts[0].text,
+      option_b: opts[1].text,
+      option_c: opts[2].text,
+      option_d: opts[3].text,
+      correct_option: newCorrect,
+    }
+  })
+
   // Separate questions (no correct_option) from answers
-  const questions = parsed.map(({ correct_option: _skip, ...rest }) => rest)
-  const answers   = parsed.map((q) => q.correct_option)
+  const questions = shuffled.map(({ correct_option: _skip, ...rest }) => rest)
+  const answers   = shuffled.map((q) => q.correct_option)
 
   // ── Save battle to DB ──────────────────────────────────────────────────────
   const { data: battle, error: insertErr } = await supabase
