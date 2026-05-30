@@ -79,6 +79,7 @@ export default function QuizBattlePage({ params }: Props) {
   const [currentQ, setCurrentQ]         = useState(0)
   const [selected, setSelected]         = useState<Option | null>(null)
   const [confirmed, setConfirmed]       = useState(false)
+  const [correctAnswer, setCorrectAnswer] = useState<string | null>(null)
   const [userAnswers, setUserAnswers]   = useState<Record<number, string>>({})
   const [startedAt, setStartedAt]       = useState<number | null>(null)
   const [elapsed, setElapsed]           = useState(0)
@@ -152,12 +153,25 @@ export default function QuizBattlePage({ params }: Props) {
     setUserAnswers({})
     setSelected(null)
     setConfirmed(false)
+    setCorrectAnswer(null)
   }
 
-  function confirmAnswer() {
+  async function confirmAnswer() {
     if (!selected) return
     setUserAnswers((prev) => ({ ...prev, [currentQ]: selected }))
     setConfirmed(true)
+    // Reveal correct answer for this question
+    try {
+      const res = await fetch(`/api/quiz-battles/${id}/check-answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionIndex: currentQ }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setCorrectAnswer(data.correctAnswer)
+      }
+    } catch { /* non-critical */ }
   }
 
   function nextQuestion() {
@@ -166,6 +180,7 @@ export default function QuizBattlePage({ params }: Props) {
       setCurrentQ((q) => q + 1)
       setSelected(null)
       setConfirmed(false)
+      setCorrectAnswer(null)
     } else {
       submitAnswers()
     }
@@ -349,12 +364,23 @@ export default function QuizBattlePage({ params }: Props) {
         <p className="text-base font-medium text-slate-900 leading-relaxed mb-5">{q.question}</p>
 
         {/* Options */}
-        <div className="space-y-2.5 mb-5">
+        <div className="space-y-2.5 mb-4">
           {OPTIONS.map((opt) => {
             let cls = 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40 text-slate-700'
-            if (confirmed) {
-              cls = 'border-slate-100 bg-white text-slate-400 cursor-default'
-              if (opt === selected) cls = 'border-indigo-300 bg-indigo-50 text-indigo-800 cursor-default'
+            if (confirmed && correctAnswer) {
+              const isCorrect = opt === correctAnswer
+              const isSelected = opt === selected
+              if (isCorrect) {
+                cls = 'border-emerald-400 bg-emerald-50 text-emerald-800 cursor-default'
+              } else if (isSelected && !isCorrect) {
+                cls = 'border-red-400 bg-red-50 text-red-700 cursor-default'
+              } else {
+                cls = 'border-slate-100 bg-white text-slate-300 cursor-default'
+              }
+            } else if (confirmed) {
+              cls = opt === selected
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-800 cursor-default'
+                : 'border-slate-100 bg-white text-slate-400 cursor-default'
             } else if (opt === selected) {
               cls = 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-300 text-indigo-900 font-medium'
             }
@@ -367,10 +393,31 @@ export default function QuizBattlePage({ params }: Props) {
               >
                 <span className="font-bold uppercase flex-shrink-0 w-4 mt-0.5">{opt}.</span>
                 <span className="flex-1 leading-snug">{optionText(q, opt)}</span>
+                {confirmed && correctAnswer && opt === correctAnswer && (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                )}
+                {confirmed && correctAnswer && opt === selected && opt !== correctAnswer && (
+                  <XCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                )}
               </button>
             )
           })}
         </div>
+
+        {/* Feedback chip */}
+        {confirmed && correctAnswer && (
+          <div className={cn(
+            'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold mb-3',
+            selected === correctAnswer
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          )}>
+            {selected === correctAnswer
+              ? <><CheckCircle2 className="w-4 h-4" /> Correct!</>
+              : <><XCircle className="w-4 h-4" /> Incorrect — correct answer: <span className="uppercase">{correctAnswer}</span></>
+            }
+          </div>
+        )}
 
         {!confirmed ? (
           <button
@@ -383,11 +430,11 @@ export default function QuizBattlePage({ params }: Props) {
         ) : (
           <button
             onClick={nextQuestion}
-            disabled={submitting}
+            disabled={submitting || !correctAnswer}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
-            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-            {isLast ? (submitting ? 'Submitting…' : 'Submit Answers') : 'Next Question →'}
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {submitting ? 'Submitting…' : isLast ? 'Submit Answers' : 'Next Question →'}
           </button>
         )}
       </div>
