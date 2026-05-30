@@ -79,7 +79,8 @@ export default function QuizBattlePage({ params }: Props) {
   const [currentQ, setCurrentQ]         = useState(0)
   const [selected, setSelected]         = useState<Option | null>(null)
   const [confirmed, setConfirmed]       = useState(false)
-  const [correctAnswer, setCorrectAnswer] = useState<string | null>(null)
+  const [correctAnswer, setCorrectAnswer]       = useState<string | null>(null)
+  const [answerFetchDone, setAnswerFetchDone]   = useState(false)
   const [userAnswers, setUserAnswers]   = useState<Record<number, string>>({})
   const [startedAt, setStartedAt]       = useState<number | null>(null)
   const [elapsed, setElapsed]           = useState(0)
@@ -154,13 +155,14 @@ export default function QuizBattlePage({ params }: Props) {
     setSelected(null)
     setConfirmed(false)
     setCorrectAnswer(null)
+    setAnswerFetchDone(false)
   }
 
   async function confirmAnswer() {
     if (!selected) return
     setUserAnswers((prev) => ({ ...prev, [currentQ]: selected }))
     setConfirmed(true)
-    // Reveal correct answer for this question
+    // Reveal correct answer — always unblock Next even if fetch fails
     try {
       const res = await fetch(`/api/quiz-battles/${id}/check-answer`, {
         method: 'POST',
@@ -171,7 +173,9 @@ export default function QuizBattlePage({ params }: Props) {
         const data = await res.json()
         setCorrectAnswer(data.correctAnswer)
       }
-    } catch { /* non-critical */ }
+    } catch { /* ignore */ } finally {
+      setAnswerFetchDone(true)
+    }
   }
 
   function nextQuestion() {
@@ -181,6 +185,7 @@ export default function QuizBattlePage({ params }: Props) {
       setSelected(null)
       setConfirmed(false)
       setCorrectAnswer(null)
+      setAnswerFetchDone(false)
     } else {
       submitAnswers()
     }
@@ -430,11 +435,11 @@ export default function QuizBattlePage({ params }: Props) {
         ) : (
           <button
             onClick={nextQuestion}
-            disabled={submitting || !correctAnswer}
+            disabled={submitting || !answerFetchDone}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {submitting ? 'Submitting…' : isLast ? 'Submit Answers' : 'Next Question →'}
+            {(submitting || !answerFetchDone) ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {submitting ? 'Submitting…' : !answerFetchDone ? 'Loading…' : isLast ? 'Submit Answers' : 'Next Question →'}
           </button>
         )}
       </div>
