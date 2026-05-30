@@ -155,6 +155,15 @@ export function RecoveryTopicCard({ topic, initialPlan }: Props) {
       const finalScore = results.filter((r) => r.isCorrect).length
       const passed = finalScore >= 2  // 2/3 or 3/3
       awardXP({ type: passed ? 'RECOVERY_QUIZ_PASS' : 'RECOVERY_QUIZ_COMPLETE' })
+      // Track answers for leaderboard
+      fetch('/api/track-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'recovery',
+          answers: results.map((r) => ({ is_correct: r.isCorrect })),
+        }),
+      }).catch(() => {})
       setQuizMode('done')
     }
   }

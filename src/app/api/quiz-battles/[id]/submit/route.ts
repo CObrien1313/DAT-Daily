@@ -48,6 +48,16 @@ export async function POST(request: Request, { params }: Props) {
 
   await supabase.from('quiz_battles').update(updateFields).eq('id', id)
 
+  // Track answers for leaderboard (fire-and-forget)
+  const now = new Date().toISOString()
+  const answerRows = correctAnswers.map((correct, i) => ({
+    user_id:     user.id,
+    source:      'battle',
+    is_correct:  userAnswers[i] === correct,
+    answered_at: now,
+  }))
+  await supabase.from('question_answers').insert(answerRows)
+
   // Re-fetch to check if both have submitted
   const { data: updated } = await supabase
     .from('quiz_battles')
