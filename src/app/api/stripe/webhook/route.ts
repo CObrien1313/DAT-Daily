@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getStripe } from '@/lib/stripe'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import type Stripe from 'stripe'
+
+// Use service role to bypass RLS — webhooks have no user session
+function getAdminClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Stripe requires the raw body to verify webhook signatures
 export const dynamic = 'force-dynamic'
 
 async function setPlan(supabaseUserId: string, plan: 'free' | 'pro', subscriptionId?: string, status?: string) {
-  const supabase = await createClient()
+  const supabase = getAdminClient()
   await supabase
     .from('profiles')
     .update({
