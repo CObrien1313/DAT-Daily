@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Zap, CheckCircle2, X, Sparkles, Sword, Calendar, BookOpen, Clock } from 'lucide-react'
+import { useEffect, useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Zap, CheckCircle2, X, Sparkles, Sword, Calendar, BookOpen, Clock, Loader2 } from 'lucide-react'
 import type { Plan } from '@/lib/subscription'
 
 // ── Promo config — change these when the promo ends ──────────────────────────
@@ -42,10 +43,15 @@ const PRO_FEATURES = [
   'Priority support',
 ]
 
-export default function UpgradePage() {
-  const [usage, setUsage]   = useState<UsageData | null>(null)
-  const [promoOn, setPromoOn] = useState(false)
+function UpgradeContent() {
+  const [usage, setUsage]       = useState<UsageData | null>(null)
+  const [promoOn, setPromoOn]   = useState(false)
   const [daysLeft, setDaysLeft] = useState(0)
+  const [loading, setLoading]   = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
+  const searchParams = useSearchParams()
+  const successMsg  = searchParams.get('success')  === '1'
+  const canceledMsg = searchParams.get('canceled') === '1'
 
   useEffect(() => {
     setPromoOn(isPromoActive())
@@ -55,6 +61,28 @@ export default function UpgradePage() {
       .then((d) => { if (d) setUsage(d) })
       .catch(() => {})
   }, [])
+
+  async function handleUpgrade() {
+    setLoading(true)
+    try {
+      const res  = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handlePortal() {
+    setPortalLoading(true)
+    try {
+      const res  = await fetch('/api/stripe/portal', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } finally {
+      setPortalLoading(false)
+    }
+  }
 
   const isPro        = usage?.plan === 'pro'
   const displayPrice = promoOn ? PROMO_PRICE : REGULAR_PRICE
@@ -196,6 +224,18 @@ export default function UpgradePage() {
         </div>
       </div>
 
+      {/* Success / cancel banners */}
+      {successMsg && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-4 text-sm font-medium text-emerald-700">
+          🎉 Welcome to Pro! Your account has been upgraded.
+        </div>
+      )}
+      {canceledMsg && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 mb-4 text-sm text-slate-500">
+          Checkout canceled — no charge was made.
+        </div>
+      )}
+
       {/* CTA */}
       {!isPro ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center space-y-4">
@@ -206,27 +246,51 @@ export default function UpgradePage() {
             </p>
             <p className="text-sm text-slate-500">
               {promoOn
-                ? `Launch pricing ends July 1st. Lock in $${PROMO_PRICE} now — payments launching soon.`
-                : 'Payments launching soon. Join the waitlist and get notified when Pro goes live.'}
+                ? `Launch pricing ends July 1st. Lock in $${PROMO_PRICE} now.`
+                : `$${REGULAR_PRICE}/month. Cancel anytime.`}
             </p>
           </div>
-          <a
-            href={`mailto:obrienconor632@gmail.com?subject=DAT%20Daily%20Pro%20-%20Early%20Access&body=Hi%2C%20I%27d%20like%20to%20be%20notified%20when%20DAT%20Daily%20Pro%20launches!`}
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity"
+          <button
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
           >
-            <Zap className="w-4 h-4" />
-            {promoOn ? `Join Waitlist — Lock in $${PROMO_PRICE}/mo` : 'Join the Pro Waitlist'}
-          </a>
-          <p className="text-xs text-slate-400">No commitment. We&apos;ll email you when payments go live.</p>
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Zap className="w-4 h-4" />
+            )}
+            {loading
+              ? 'Redirecting…'
+              : promoOn
+                ? `Get Pro — $${PROMO_PRICE} first month`
+                : 'Upgrade to Pro'}
+          </button>
+          <p className="text-xs text-slate-400">Secure checkout via Stripe. Cancel anytime.</p>
         </div>
       ) : (
-        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-6 text-center space-y-2">
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-6 text-center space-y-3">
           <p className="text-base font-bold text-slate-900">You&apos;re all set! ✨</p>
           <p className="text-sm text-slate-500">
             Enjoy unlimited AI planning, recovery plans, and battles. Thanks for supporting DAT Daily!
           </p>
+          <button
+            onClick={handlePortal}
+            disabled={portalLoading}
+            className="text-xs text-amber-600 underline underline-offset-2 hover:text-amber-700 disabled:opacity-60"
+          >
+            {portalLoading ? 'Loading…' : 'Manage subscription / cancel'}
+          </button>
         </div>
       )}
     </div>
+  )
+}
+
+export default function UpgradePage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400 text-sm">Loading…</div>}>
+      <UpgradeContent />
+    </Suspense>
   )
 }

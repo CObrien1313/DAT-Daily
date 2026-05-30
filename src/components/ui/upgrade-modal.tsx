@@ -1,7 +1,7 @@
 'use client'
 
-import { X, Zap, CheckCircle2, Clock } from 'lucide-react'
-import Link from 'next/link'
+import { useState } from 'react'
+import { X, Zap, CheckCircle2, Clock, Loader2 } from 'lucide-react'
 
 const PROMO_END    = new Date('2026-07-01T00:00:00Z')
 const PROMO_PRICE  = 4.99
@@ -22,6 +22,18 @@ interface Props {
 export function UpgradeModal({ message, onClose }: Props) {
   const promoActive = new Date() < PROMO_END
   const daysLeft    = Math.max(0, Math.ceil((PROMO_END.getTime() - Date.now()) / 86_400_000))
+  const [loading, setLoading] = useState(false)
+
+  async function handleUpgrade() {
+    setLoading(true)
+    try {
+      const res  = await fetch('/api/stripe/checkout', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
@@ -81,14 +93,14 @@ export function UpgradeModal({ message, onClose }: Props) {
 
           {/* CTAs */}
           <div className="space-y-2 pt-1">
-            <Link
-              href="/upgrade"
-              onClick={onClose}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity"
+            <button
+              onClick={handleUpgrade}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              <Zap className="w-4 h-4" />
-              {promoActive ? `Get Pro — $${PROMO_PRICE} first month` : 'Upgrade to Pro'}
-            </Link>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              {loading ? 'Redirecting…' : promoActive ? `Get Pro — $${PROMO_PRICE} first month` : 'Upgrade to Pro'}
+            </button>
             <button onClick={onClose} className="w-full py-2.5 rounded-xl text-sm text-slate-400 hover:text-slate-600 transition-colors">
               Maybe later
             </button>
