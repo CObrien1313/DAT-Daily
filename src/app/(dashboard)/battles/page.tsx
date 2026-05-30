@@ -6,6 +6,7 @@ import { Sword, Loader2, Plus, CheckCircle, XCircle, Clock, Trophy, Zap } from '
 import { getAvatarColor, getInitials } from '@/lib/avatar'
 import { cn } from '@/lib/utils'
 import { CreateBattleModal } from '@/components/battles/create-battle-modal'
+import { UpgradeModal } from '@/components/ui/upgrade-modal'
 import { formatTimeRemaining, getBattleTypeInfo, type BattleWithProfiles } from '@/lib/battles'
 
 type Tab = 'active' | 'challenges' | 'history' | 'quiz'
@@ -116,6 +117,7 @@ export default function BattlesPage() {
   const [loading, setLoading]     = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [responding, setResponding] = useState<string | null>(null)
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -150,10 +152,18 @@ export default function BattlesPage() {
 
   async function respondQuiz(battleId: string, action: 'accept' | 'decline') {
     setResponding(battleId)
-    await fetch(`/api/quiz-battles/${battleId}/respond`, {
+    const res = await fetch(`/api/quiz-battles/${battleId}/respond`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      if (data.error === 'limit_reached') {
+        setUpgradeMsg(data.message)
+        setResponding(null)
+        return
+      }
+    }
     await load()
     setResponding(null)
   }
@@ -396,6 +406,9 @@ export default function BattlesPage() {
 
       {showCreate && (
         <CreateBattleModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />
+      )}
+      {upgradeMsg && (
+        <UpgradeModal message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />
       )}
     </div>
   )
