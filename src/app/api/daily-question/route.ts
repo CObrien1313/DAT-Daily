@@ -101,12 +101,12 @@ export async function GET(request: Request) {
 ${extra}
 
 CRITICAL RULES — follow these in order:
-1. Solve the problem yourself first. Compute the exact correct answer before writing any options.
-2. One of the four options (a, b, c, or d) MUST be that exact correct answer — not "close to" it, not "approximately" it. The exact value.
-3. The other three distractors must each correspond to a specific, named student mistake (e.g. forgetting to convert units, using the wrong formula, making a sign error). Do NOT invent random nearby numbers.
-4. correct_option must be exactly one of: "a", "b", "c", "d" — whichever position holds the correct answer. Do NOT default to "a". Place the correct answer in a random position each time.
-5. explanation: 2–3 sentences showing the step-by-step solution to the exact correct answer and why the common wrong answers are wrong.
-6. For numerical questions: all answer choices must be realistic values a student might compute; do not use placeholder "..." values.
+1. Silently work out the full solution BEFORE writing any JSON. Do all arithmetic completely.
+2. Decide which of the four positions (a, b, c, or d) will hold the correct answer — vary this each time, do NOT default to "a".
+3. Write the correct answer into that position. Fill the other three with plausible distractors based on named student mistakes (wrong formula, unit error, sign error, etc.).
+4. correct_option must match the position containing the exact correct answer. Double-check this before outputting.
+5. explanation: reference option letters as they appear in your JSON (e.g. "Option B is correct because..."). 2–3 sentences max.
+6. Do NOT second-guess or revise mid-output. Commit to your answer.
 
 Return ONLY this JSON (no extra text, no markdown):
 {
@@ -129,32 +129,22 @@ Return ONLY this JSON (no extra text, no markdown):
     return NextResponse.json({ error: 'Could not parse AI response' }, { status: 500 })
   }
 
-  // Shuffle options so the correct answer lands in a random position every time
-  const opts = [
-    { key: 'a' as const, text: parsed.option_a },
-    { key: 'b' as const, text: parsed.option_b },
-    { key: 'c' as const, text: parsed.option_c },
-    { key: 'd' as const, text: parsed.option_d },
-  ]
-  for (let i = opts.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[opts[i], opts[j]] = [opts[j], opts[i]]
-  }
-  const correctText   = parsed[`option_${parsed.correct_option}` as keyof GeneratedQuestion] as string
-  const correctOption = opts.find((o) => o.text === correctText)?.key ?? parsed.correct_option
+  // NOTE: we do NOT shuffle daily question options because the explanation
+  // references option letters by name (e.g. "Option B is wrong because...").
+  // Variety is handled purely through the prompt.
 
   // Upsert so concurrent requests don't conflict
   const { data: saved, error: saveErr } = await supabase
     .from('daily_questions')
     .upsert({
-      question_date: questionDate,
+      question_date:  questionDate,
       subject:        parsed.subject,
       question:       parsed.question,
-      option_a:       opts[0].text,
-      option_b:       opts[1].text,
-      option_c:       opts[2].text,
-      option_d:       opts[3].text,
-      correct_option: correctOption,
+      option_a:       parsed.option_a,
+      option_b:       parsed.option_b,
+      option_c:       parsed.option_c,
+      option_d:       parsed.option_d,
+      correct_option: parsed.correct_option,
       explanation:    parsed.explanation,
     }, { onConflict: 'question_date' })
     .select()
