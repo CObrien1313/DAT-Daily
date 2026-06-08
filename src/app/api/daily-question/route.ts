@@ -79,9 +79,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'AI not configured' }, { status: 503 })
   }
 
-  // Pick subject deterministically from the date so all users get the same subject
-  const dateNum = parseInt(questionDate.replace(/-/g, ''), 10)
-  const subject = DAT_SUBJECTS[dateNum % DAT_SUBJECTS.length]
+  // Pick subject and correct-answer slot deterministically from the date
+  // so all users get the same question. Using different offsets so subject
+  // and slot don't cycle in lockstep.
+  const dateNum     = parseInt(questionDate.replace(/-/g, ''), 10)
+  const subject     = DAT_SUBJECTS[dateNum % DAT_SUBJECTS.length]
+  const SLOTS       = ['a', 'b', 'c', 'd'] as const
+  const correctSlot = SLOTS[Math.floor(dateNum / DAT_SUBJECTS.length) % 4]
 
   const subjectInstructions: Record<string, string> = {
     'Perceptual Ability': 'Create a text-based spatial reasoning question (e.g. cube counting, angle comparison, paper folding described in words).',
@@ -100,13 +104,12 @@ export async function GET(request: Request) {
       content: `Generate one challenging DAT practice question on the topic: ${subject}.
 ${extra}
 
-CRITICAL RULES — follow these in order:
-1. Silently work out the full solution BEFORE writing any JSON. Do all arithmetic completely.
-2. Decide which of the four positions (a, b, c, or d) will hold the correct answer — vary this each time, do NOT default to "a".
-3. Write the correct answer into that position. Fill the other three with plausible distractors based on named student mistakes (wrong formula, unit error, sign error, etc.).
-4. correct_option must match the position containing the exact correct answer. Double-check this before outputting.
-5. explanation: reference option letters as they appear in your JSON (e.g. "Option B is correct because..."). 2–3 sentences max.
-6. Do NOT second-guess or revise mid-output. Commit to your answer.
+INSTRUCTIONS:
+1. Work out the full correct answer completely before writing any JSON.
+2. The correct answer MUST go in option_${correctSlot}. This is mandatory.
+3. Fill the other three options with plausible wrong answers based on specific student mistakes (e.g. wrong formula, unit error, sign error).
+4. Set correct_option to "${correctSlot}".
+5. explanation: 2–3 sentences. Start with "Option ${correctSlot.toUpperCase()} is correct because..." then briefly explain why each wrong option is wrong.
 
 Return ONLY this JSON (no extra text, no markdown):
 {
@@ -116,7 +119,7 @@ Return ONLY this JSON (no extra text, no markdown):
   "option_b": "...",
   "option_c": "...",
   "option_d": "...",
-  "correct_option": "c",
+  "correct_option": "${correctSlot}",
   "explanation": "..."
 }`,
     }],
