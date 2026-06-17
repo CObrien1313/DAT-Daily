@@ -155,7 +155,9 @@ export async function GET(request: Request) {
   const dateNum     = parseInt(questionDate.replace(/-/g, ''), 10)
   const subject     = DAT_SUBJECTS[dateNum % DAT_SUBJECTS.length]
   const SLOTS       = ['a', 'b', 'c', 'd'] as const
-  const correctSlot = SLOTS[Math.floor(dateNum / DAT_SUBJECTS.length) % 4]
+  // Use a different prime-offset combination so correct slot rotates daily
+  // and is not correlated with the subject cycle.
+  const correctSlot = SLOTS[(dateNum * 3 + 2) % 4]
 
   const subjectInstructions: Record<string, string> = {
     'Perceptual Ability - Angle Ranking': 'Describe 4 angles in words (e.g. "an angle that opens to about 30 degrees") and ask which is largest or smallest.',
@@ -173,21 +175,20 @@ export async function GET(request: Request) {
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system: 'You are a DAT exam expert. Output ONLY raw JSON — no markdown fences, no explanation.',
+    max_tokens: 2048,
+    system: 'You are a DAT exam expert. You will reason through the problem carefully before producing your final answer.',
     messages: [{
       role: 'user',
       content: `Generate one challenging DAT practice question on the topic: ${subject}.
 ${extra}
 
 INSTRUCTIONS:
-1. Work out the full correct answer completely before writing any JSON.
-2. The correct answer MUST go in option_${correctSlot}. This is mandatory.
-3. Fill the other three options with plausible wrong answers based on specific student mistakes (e.g. wrong formula, unit error, sign error).
-4. Set correct_option to "${correctSlot}".
-5. explanation: 2–3 sentences. Start with "Option ${correctSlot.toUpperCase()} is correct because..." then briefly explain why each wrong option is wrong.
+1. First, reason through the topic and determine a clear, factually correct question and the single best correct answer. Show your thinking.
+2. Then place the correct answer in option_${correctSlot} and fill the other three options with plausible wrong answers based on common student mistakes (e.g. wrong formula, unit error, sign error, off-by-one).
+3. Set correct_option to "${correctSlot}".
+4. Write a 2–3 sentence explanation starting with "Option ${correctSlot.toUpperCase()} is correct because..." then briefly explain why each wrong option is incorrect.
 
-Return ONLY this JSON (no extra text, no markdown):
+After your reasoning, output ONLY this JSON block (no markdown fences):
 {
   "subject": "${subject}",
   "question": "...",
